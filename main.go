@@ -6,31 +6,49 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/kataras/iris/v12"
 	"github.com/tidwall/gjson"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"gopkg.in/yaml.v3"
 )
 
+type Config struct {
+	APIKey  string `yaml:"apikey"`
+	MongoDB string `yaml:"mongodb"`
+}
+
+var config = Config{}
+
 func main() {
+	loadConfig()
+
 	app := iris.New()
-
 	app.Get("/", hello)
-
 	collectionAPI := app.Party("/collections")
 	{
 		collectionAPI.Get("/immediate", listImmediateCollections)
 		collectionAPI.Get("/cached", listCachedCollections)
 		collectionAPI.Get("/{address}", collectionInfo)
 	}
-
 	app.Listen(":8080")
 }
 
+func loadConfig() {
+	data, err := os.ReadFile("config.yaml")
+	if err != nil {
+		panic(err)
+	}
+	if err = yaml.Unmarshal(data, &config); err != nil {
+		panic(err)
+	}
+}
+
 func connectDB() *mongo.Client {
-	options := options.Client().ApplyURI("mongodb://127.0.0.1:27017")
+	options := options.Client().ApplyURI(config.MongoDB)
 	client, err := mongo.Connect(context.TODO(), options)
 	if err != nil {
 		panic(err)
@@ -54,7 +72,7 @@ func listImmediateCollections(ctx iris.Context) {
 	if err != nil {
 		panic(err)
 	}
-	req.Header.Add("X-API-KEY", "qX7ar8tkN2p4dYlJLP5XIXeL")
+	req.Header.Add("X-API-KEY", config.APIKey)
 
 	// send request
 	res, err := httpClient.Do(req)
