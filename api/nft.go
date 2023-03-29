@@ -1,6 +1,8 @@
 package api
 
 import (
+	"nft-info-collector/http"
+
 	"github.com/kataras/iris/v12"
 )
 
@@ -9,7 +11,7 @@ func GetNFTInfo(ctx iris.Context) {
 	contract := ctx.Params().Get("contract")
 	tokenID := ctx.Params().Get("token_id")
 
-	data := GetNFTScan("https://restapi.nftscan.com/api/v2/assets/"+contract+"/"+tokenID+"?show_attribute=true", logger)
+	data := http.GetOpenSeaAsset(logger, contract, tokenID)
 
 	ctx.WriteString(data)
 }

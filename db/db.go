@@ -11,7 +11,7 @@ import (
 )
 
 func Connect() (*mongo.Client, error) {
-	options := options.Client().ApplyURI(config.Load().MongoDB)
+	options := options.Client().ApplyURI(config.Load().MongoDB["url"])
 	return mongo.Connect(context.TODO(), options)
 }
 
@@ -36,7 +36,7 @@ func GetCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo
 	return results, nil
 }
 
-func CacheCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, collections []interface{}) error {
+func ReplaceCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, collections []interface{}) error {
 	// delete old
 	filter := bson.D{{}}
 	delete, err := coll.DeleteMany(ctx, filter)
@@ -51,5 +51,20 @@ func CacheCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Col
 		return err
 	}
 	logger.Info("[DB] Collections inserted: ", len(insert.InsertedIDs))
+	return nil
+}
+
+func UpdateCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, collections []interface{}) error {
+	models := []mongo.WriteModel{}
+	for _, collection := range collections {
+		// some problem, should find than decide update or insert
+		slug := collection.(map[string]interface{})["slug"]
+		models = append(models, mongo.NewReplaceOneModel().SetUpsert(true).SetFilter(bson.M{"slug": slug}).SetReplacement(collection))
+	}
+	update, err := coll.BulkWrite(ctx, models)
+	if err != nil {
+		return err
+	}
+	logger.Info("[DB] Collections matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
 	return nil
 }

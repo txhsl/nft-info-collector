@@ -22,21 +22,21 @@ func main() {
 
 	// iris routes
 	app.Get("/", hello)
-	collectionsAPI := app.Party("/collections")
+	trendsAPI := app.Party("/trends")
 	{
-		collectionsAPI.Get("/immediate", api.ListImmediateCollections)
-		collectionsAPI.Get("/cached", api.ListCachedCollections)
+		trendsAPI.Get("/immediate", api.ListImmediateTrends)
+		trendsAPI.Get("/cached", api.ListCachedTrends)
 	}
 	collectionAPI := app.Party("/collection")
 	{
+		collectionAPI.Get("/update", api.UpdateCachedCollections)
+		collectionAPI.Get("/list", api.ListCachedCollections)
 		collectionAPI.Get("/info/{contract}", api.GetCollectionInfo)
 		collectionAPI.Get("/info/{contract}/{token_id}", api.GetNFTInfo)
-		collectionAPI.Get("/statistics/{contract}", api.GetCollectionStatistics)
 	}
 	userAPI := app.Party("/user")
 	{
-		userAPI.Get("/nfts/{address}", api.GetUserNFTs)
-		userAPI.Get("/collections/{address}/{page}", api.GetUserCollections)
+		userAPI.Get("/assets/{address}", api.GetUserNFTs)
 	}
 	searchAPI := app.Party("/search")
 	{

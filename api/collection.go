@@ -3,23 +3,18 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"nft-info-collector/config"
 	"nft-info-collector/db"
+	"nft-info-collector/http"
 
 	"github.com/kataras/iris/v12"
 )
 
-func ListImmediateCollections(ctx iris.Context) {
+func UpdateCachedCollections(ctx iris.Context) {
 	logger := ctx.Application().Logger()
+	conf := config.Load().OpenSea
 
-	data := GetNFTScan("https://restapi.nftscan.com/api/v2/statistics/ranking/trade?time=7d&sort_field=volume&sort_direction=desc&show_7d_trends=false", logger)
-
-	// cache result
-	var collections []interface{}
-	err := json.Unmarshal([]byte(data), &collections)
-	if err != nil {
-		logger.Error("[API] Failed to serialize collections")
-		panic(err)
-	}
 	dbClient, err := db.Connect()
 	if err != nil {
 		logger.Error("[DB] Failed to connect mongodb")
@@ -27,9 +22,27 @@ func ListImmediateCollections(ctx iris.Context) {
 	}
 	defer dbClient.Disconnect(context.TODO())
 	coll := dbClient.Database("nft-info-collector").Collection("collections")
-	db.CacheCollections(context.TODO(), logger, coll, collections)
 
-	ctx.WriteString(data)
+	for i := 0; i < conf["limit"]; i += conf["page-size"] {
+		data := http.GetOpenSeaCollections(logger, i, conf["page-size"])
+
+		// cache result
+		var collections []interface{}
+		err := json.Unmarshal([]byte(data), &collections)
+		if err != nil {
+			logger.Error("[API] Failed to serialize collections")
+			panic(err)
+		}
+		err = db.UpdateCachedCollections(context.TODO(), logger, coll, collections)
+		if err != nil {
+			logger.Error("[DB] Failed to update cached collections")
+			panic(err)
+		}
+
+		logger.Info("[DB] Collections updated: " + fmt.Sprint(i+conf["page-size"]) + " / " + fmt.Sprint(conf["limit"]))
+	}
+
+	ctx.WriteString("OK")
 }
 
 func ListCachedCollections(ctx iris.Context) {
@@ -58,18 +71,9 @@ func ListCachedCollections(ctx iris.Context) {
 
 func GetCollectionInfo(ctx iris.Context) {
 	logger := ctx.Application().Logger()
-	contract := ctx.Params().Get("contract")
+	slug := ctx.Params().Get("slug")
 
-	data := GetNFTScan("https://restapi.nftscan.com/api/v2/collections/"+contract+"?show_attribute=true", logger)
-
-	ctx.WriteString(data)
-}
-
-func GetCollectionStatistics(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-	contract := ctx.Params().Get("contract")
-
-	data := GetNFTScan("https://restapi.nftscan.com/api/v2/statistics/collection/"+contract, logger)
+	data := http.GetOpenSeaCollectionInfo(logger, slug)
 
 	ctx.WriteString(data)
 }
