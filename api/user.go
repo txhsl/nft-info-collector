@@ -10,7 +10,7 @@ func GetUserNFTs(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 	account := ctx.Params().Get("account")
 
-	data := http.GetOpenSeaAssets(logger, account)
+	data := http.GetOpenSeaUserAssets(logger, account)
 
 	ctx.WriteString(data)
 }

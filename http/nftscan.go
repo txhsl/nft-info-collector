@@ -9,6 +9,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// Used in DB cache and immediate response
 func GetNFTScanTrends(logger *golog.Logger) string {
 	// build request
 	httpClient := &http.Client{}

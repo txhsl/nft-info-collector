@@ -24,7 +24,7 @@ func UpdateCachedCollections(ctx iris.Context) {
 	coll := dbClient.Database("nft-info-collector").Collection("collections")
 
 	for i := 0; i < conf.Limit; i += conf.PageSize {
-		data := http.GetNFTGoCollections(logger, i, conf.PageSize)
+		data := http.GetNFTGoCollections(logger, fmt.Sprint(i), fmt.Sprint(conf.PageSize))
 
 		// cache result
 		var collections []interface{}

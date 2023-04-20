@@ -46,7 +46,7 @@ func TestGetOpenSeaAsset(t *testing.T) {
 
 func TestGetOpenSeaAssets(t *testing.T) {
 	logger := iris.New().Logger()
-	data := http.GetOpenSeaAssets(logger, "0x480dd671880768D24317FA965D00f43D25868892")
+	data := http.GetOpenSeaUserAssets(logger, "0x480dd671880768D24317FA965D00f43D25868892")
 
 	var assets []interface{}
 	err := json.Unmarshal([]byte(data), &assets)

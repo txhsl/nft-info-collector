@@ -9,6 +9,8 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// Only used in DB cache
+// @deprecated
 func GetOpenSeaCollections(logger *golog.Logger, offset int, limit int) string {
 	// build request
 	httpClient := &http.Client{}
@@ -37,6 +39,7 @@ func GetOpenSeaCollections(logger *golog.Logger, offset int, limit int) string {
 	return gjson.Get(string(body), "collections").String()
 }
 
+// Used in immediate response
 func GetOpenSeaCollectionInfo(logger *golog.Logger, slug string) string {
 	// build request
 	httpClient := &http.Client{}
@@ -64,6 +67,7 @@ func GetOpenSeaCollectionInfo(logger *golog.Logger, slug string) string {
 	return gjson.Get(string(body), "collection").String()
 }
 
+// Used in immediate response
 func GetOpenSeaAsset(logger *golog.Logger, contract string, id string) string {
 	// build request
 	httpClient := &http.Client{}
@@ -91,7 +95,8 @@ func GetOpenSeaAsset(logger *golog.Logger, contract string, id string) string {
 	return string(body)
 }
 
-func GetOpenSeaAssets(logger *golog.Logger, account string) string {
+// Used in immediate response
+func GetOpenSeaUserAssets(logger *golog.Logger, account string) string {
 	// build request
 	httpClient := &http.Client{}
 	url := "https://api.opensea.io/api/v1/assets?format=json&owner=" + account
