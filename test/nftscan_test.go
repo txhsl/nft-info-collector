@@ -10,10 +10,13 @@ import (
 
 func TestGetNFTScanTrends(t *testing.T) {
 	logger := iris.New().Logger()
-	data := http.GetNFTScanTrends(logger)
+	data, err := http.GetNFTScanTrends(logger)
+	if err != nil {
+		t.Error(err)
+	}
 
 	var collections []interface{}
-	err := json.Unmarshal([]byte(data), &collections)
+	err = json.Unmarshal([]byte(data), &collections)
 	if err != nil {
 		t.Error(err)
 	}

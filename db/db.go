@@ -15,13 +15,14 @@ func Connect() (*mongo.Client, error) {
 	return mongo.Connect(context.TODO(), options)
 }
 
-func GetCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection) ([]bson.M, error) {
+func GetCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, offset int, limit int) ([]bson.M, error) {
 	// get collections
 	sort := bson.D{{Key: "volume", Value: -1}}
 	filter := bson.D{{}}
 	option := options.Find()
 	option.SetSort(sort)
-	option.SetLimit(100)
+	option.SetSkip(int64(offset))
+	option.SetLimit(int64(limit))
 	cursor, err := coll.Find(ctx, filter, option)
 	if err != nil {
 		return nil, err

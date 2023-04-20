@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"nft-info-collector/config"
@@ -10,175 +11,157 @@ import (
 )
 
 // Only used in DB cache
-func GetNFTGoCollections(logger *golog.Logger, offset string, limit string) string {
+func GetNFTGoCollections(logger *golog.Logger, offset int, limit int) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://data-api.nftgo.io/eth/v1/market/rank/collection/7d?by=volume&with_rarity=false&asc=false&offset=" + offset + "&limit=" + limit
+	url := "https://data-api.nftgo.io/eth/v1/market/rank/collection/7d?by=volume&with_rarity=false&asc=false&offset=" + fmt.Sprint(offset) + "&limit=" + fmt.Sprint(limit)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		logger.Error("[API] Failed to build nftgo request")
-		panic(err)
+		return "", err
 	}
 	req.Header.Add("X-API-KEY", config.Load().NFTGo.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
 	if err != nil {
-		logger.Error("[API] Failed to send nftgo request")
-		panic(err)
+		return "", err
 	}
 	defer res.Body.Close()
 
 	// analysis response
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		logger.Error("[API] Failed to read nftgo response")
-		panic(err)
+		return "", err
 	}
-	return gjson.Get(string(body), "collections").String()
+	return gjson.Get(string(body), "collections").String(), nil
 }
 
 // Used in immediate response
-func GetNFTGoCollectionMetrics(logger *golog.Logger, contract string) string {
+func GetNFTGoCollectionMetrics(logger *golog.Logger, contract string) (string, error) {
 	// build request
 	httpClient := &http.Client{}
 	url := "https://data-api.nftgo.io/eth/v1/collection/" + contract + "/metrics"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		logger.Error("[API] Failed to build nftgo request")
-		panic(err)
+		return "", err
 	}
 	req.Header.Add("X-API-KEY", config.Load().NFTGo.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
 	if err != nil {
-		logger.Error("[API] Failed to send nftgo request")
-		panic(err)
+		return "", err
 	}
 	defer res.Body.Close()
 
 	// analysis response
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		logger.Error("[API] Failed to read nftgo response")
-		panic(err)
+		return "", err
 	}
-	return string(body)
+	return string(body), nil
 }
 
 // Used in immediate response
-func GetNFTGoCollectionNFTs(logger *golog.Logger, contract string, offset string, limit string) string {
+func GetNFTGoCollectionNFTs(logger *golog.Logger, contract string, offset int, limit int) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://data-api.nftgo.io/eth/v1/collection/" + contract + "/nfts?offset=" + offset + "&limit=" + limit
+	url := "https://data-api.nftgo.io/eth/v1/collection/" + contract + "/nfts?offset=" + fmt.Sprint(offset) + "&limit=" + fmt.Sprint(limit)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		logger.Error("[API] Failed to build nftgo request")
-		panic(err)
+		return "", err
 	}
 	req.Header.Add("X-API-KEY", config.Load().NFTGo.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
 	if err != nil {
-		logger.Error("[API] Failed to send nftgo request")
-		panic(err)
+		return "", err
 	}
 	defer res.Body.Close()
 
 	// analysis response
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		logger.Error("[API] Failed to read nftgo response")
-		panic(err)
+		return "", err
 	}
-	return gjson.Get(string(body), "nfts").String()
+	return gjson.Get(string(body), "nfts").String(), nil
 }
 
 // Used in immediate response
-func GetNFTGoNFTRarity(logger *golog.Logger, contract string, id string) string {
+func GetNFTGoNFTRarity(logger *golog.Logger, contract string, id int) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://data-api.nftgo.io/eth/v1/nft/" + contract + "/" + id + "/rarity"
+	url := "https://data-api.nftgo.io/eth/v1/nft/" + contract + "/" + fmt.Sprint(id) + "/rarity"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		logger.Error("[API] Failed to build nftgo request")
-		panic(err)
+		return "", err
 	}
 	req.Header.Add("X-API-KEY", config.Load().NFTGo.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
 	if err != nil {
-		logger.Error("[API] Failed to send nftgo request")
-		panic(err)
+		return "", err
 	}
 	defer res.Body.Close()
 
 	// analysis response
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		logger.Error("[API] Failed to read nftgo response")
-		panic(err)
+		return "", err
 	}
-	return string(body)
+	return string(body), nil
 }
 
 // Used in immediate response
-func GetNFTGoNFTMetrics(logger *golog.Logger, contract string, id string) string {
+func GetNFTGoNFTMetrics(logger *golog.Logger, contract string, id int) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://data-api.nftgo.io/eth/v1/nft/" + contract + "/" + id + "/metrics"
+	url := "https://data-api.nftgo.io/eth/v1/nft/" + contract + "/" + fmt.Sprint(id) + "/metrics"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		logger.Error("[API] Failed to build nftgo request")
-		panic(err)
+		return "", err
 	}
 	req.Header.Add("X-API-KEY", config.Load().NFTGo.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
 	if err != nil {
-		logger.Error("[API] Failed to send nftgo request")
-		panic(err)
+		return "", err
 	}
 	defer res.Body.Close()
 
 	// analysis response
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		logger.Error("[API] Failed to read nftgo response")
-		panic(err)
+		return "", err
 	}
-	return string(body)
+	return string(body), nil
 }
 
 // Used in immediate response
-func GetNFTGoUserAssets(logger *golog.Logger, account string, offset string, limit string) string {
+func GetNFTGoUserAssets(logger *golog.Logger, account string, offset int, limit int) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://data-api.nftgo.io/eth/v1/address/" + account + "/portfolio?offset=" + offset + "&limit=" + limit
+	url := "https://data-api.nftgo.io/eth/v1/address/" + account + "/portfolio?offset=" + fmt.Sprint(offset) + "&limit=" + fmt.Sprint(limit)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		logger.Error("[API] Failed to build nftgo request")
-		panic(err)
+		return "", err
 	}
 	req.Header.Add("X-API-KEY", config.Load().NFTGo.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
 	if err != nil {
-		logger.Error("[API] Failed to send nftgo request")
-		panic(err)
+		return "", err
 	}
 	defer res.Body.Close()
 
 	// analysis response
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		logger.Error("[API] Failed to read nftgo response")
-		panic(err)
+		return "", err
 	}
-	return gjson.Get(string(body), "assets").String()
+	return gjson.Get(string(body), "assets").String(), nil
 }
