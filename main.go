@@ -22,6 +22,7 @@ func main() {
 
 	// iris routes
 	app.Get("/", hello)
+
 	trendsAPI := app.Party("/trends")
 	{
 		trendsAPI.Get("/immediate", api.ListImmediateTrends)

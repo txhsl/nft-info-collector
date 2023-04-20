@@ -11,7 +11,7 @@ import (
 )
 
 func Connect() (*mongo.Client, error) {
-	options := options.Client().ApplyURI(config.Load().MongoDB["url"])
+	options := options.Client().ApplyURI(config.Load().MongoDB.Url)
 	return mongo.Connect(context.TODO(), options)
 }
 
@@ -61,6 +61,10 @@ func UpdateCachedCollections(ctx context.Context, logger *golog.Logger, coll *mo
 		slug := collection.(map[string]interface{})["slug"]
 		models = append(models, mongo.NewReplaceOneModel().SetUpsert(true).SetFilter(bson.M{"slug": slug}).SetReplacement(collection))
 	}
+	if len(models) == 0 {
+		return nil
+	}
+
 	update, err := coll.BulkWrite(ctx, models)
 	if err != nil {
 		return err

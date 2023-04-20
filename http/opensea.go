@@ -94,7 +94,7 @@ func GetOpenSeaAsset(logger *golog.Logger, contract string, id string) string {
 func GetOpenSeaAssets(logger *golog.Logger, account string) string {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://api.opensea.io/api/v1/assets?owner=" + account + "?format=json"
+	url := "https://api.opensea.io/api/v1/assets?format=json&owner=" + account
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		logger.Error("[API] Failed to build opensea request")

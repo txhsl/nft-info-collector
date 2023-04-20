@@ -13,7 +13,7 @@ import (
 
 func UpdateCachedCollections(ctx iris.Context) {
 	logger := ctx.Application().Logger()
-	conf := config.Load().OpenSea
+	conf := config.Load().NFTGo
 
 	dbClient, err := db.Connect()
 	if err != nil {
@@ -23,8 +23,8 @@ func UpdateCachedCollections(ctx iris.Context) {
 	defer dbClient.Disconnect(context.TODO())
 	coll := dbClient.Database("nft-info-collector").Collection("collections")
 
-	for i := 0; i < conf["limit"]; i += conf["page-size"] {
-		data := http.GetOpenSeaCollections(logger, i, conf["page-size"])
+	for i := 0; i < conf.Limit; i += conf.PageSize {
+		data := http.GetNFTGoCollections(logger, i, conf.PageSize)
 
 		// cache result
 		var collections []interface{}
@@ -39,7 +39,7 @@ func UpdateCachedCollections(ctx iris.Context) {
 			panic(err)
 		}
 
-		logger.Info("[DB] Collections updated: " + fmt.Sprint(i+conf["page-size"]) + " / " + fmt.Sprint(conf["limit"]))
+		logger.Info("[DB] Collections updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
 	}
 
 	ctx.WriteString("OK")

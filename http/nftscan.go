@@ -18,7 +18,7 @@ func GetNFTScanTrends(logger *golog.Logger) string {
 		logger.Error("[API] Failed to build nftscan request")
 		panic(err)
 	}
-	req.Header.Add("X-API-KEY", config.Load().NFTScan["api-key"])
+	req.Header.Add("X-API-KEY", config.Load().NFTScan.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
