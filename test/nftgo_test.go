@@ -12,13 +12,27 @@ import (
 func TestGetNFTGoCollections(t *testing.T) {
 	logger := iris.New().Logger()
 	conf := config.Load().NFTGo
-	data, err := http.GetNFTGoCollections(logger, 0, conf.PageSize)
+	data, err := http.GetNFTGoCollections(logger, "7d", 0, conf.PageSize)
 	if err != nil {
 		t.Error(err)
 	}
 
 	var collections []interface{}
 	err = json.Unmarshal([]byte(data), &collections)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetNFTGoCollectionInfo(t *testing.T) {
+	logger := iris.New().Logger()
+	data, err := http.GetNFTGoCollectionInfo(logger, "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d")
+	if err != nil {
+		t.Error(err)
+	}
+
+	var collection map[string]interface{}
+	err = json.Unmarshal([]byte(data), &collection)
 	if err != nil {
 		t.Error(err)
 	}

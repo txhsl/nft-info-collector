@@ -11,10 +11,10 @@ import (
 )
 
 // Only used in DB cache
-func GetNFTGoCollections(logger *golog.Logger, offset int, limit int) (string, error) {
+func GetNFTGoCollections(logger *golog.Logger, timeRange string, offset int, limit int) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://data-api.nftgo.io/eth/v1/market/rank/collection/7d?by=volume&with_rarity=false&asc=false&offset=" + fmt.Sprint(offset) + "&limit=" + fmt.Sprint(limit)
+	url := "https://data-api.nftgo.io/eth/v1/market/rank/collection/" + timeRange + "?offset=" + fmt.Sprint(offset) + "&limit=" + fmt.Sprint(limit)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
@@ -34,6 +34,31 @@ func GetNFTGoCollections(logger *golog.Logger, offset int, limit int) (string, e
 		return "", err
 	}
 	return gjson.Get(string(body), "collections").String(), nil
+}
+
+func GetNFTGoCollectionInfo(logger *golog.Logger, contract string) (string, error) {
+	// build request
+	httpClient := &http.Client{}
+	url := "https://data-api.nftgo.io/eth/v1/collection/" + contract + "/info"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("X-API-KEY", config.Load().NFTGo.ApiKey)
+
+	// send request
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	// analysis response
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
 
 // Used in immediate response

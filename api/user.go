@@ -10,16 +10,18 @@ func GetUserNFTs(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
 	// parse params
-	account := ctx.Params().Get("account")
-	if account == "" {
+	address := ctx.Params().GetString("address")
+	if address == "" {
 		ctx.StopWithStatus(iris.StatusBadRequest)
+		return
 	}
 
 	// fetch data
-	data, err := http.GetOpenSeaUserAssets(logger, account)
+	data, err := http.GetOpenSeaUserAssets(logger, address)
 	if err != nil {
 		logger.Error("[HTTP] Failed to fetch user nfts")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
 	}
 
 	ctx.WriteString(data)

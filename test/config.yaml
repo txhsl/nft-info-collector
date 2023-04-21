@@ -2,9 +2,30 @@ nftscan:
   api-key: "qX7ar8tkN2p4dYlJLP5XIXeL"
 
 nftgo: 
-  api-key: "ec2dc360-1e69-441a-8ebb-2fd520ecd1da"
+  api-key: "b8d12338-e8fd-4c20-9f82-716b89f62263"
   page-size: 50
   limit: 6000
+  keywords:
+    - "market_cap_eth"
+    - "market_cap_change_percentage"
+    - "volume_eth"
+    - "floor_price_eth"
+    - "whale_num"
+    - "holder_num"
+  filters:
+    - "blockchain"
+    - "name"
+    - "contract_type"
+    - "categories"
+    - "has_rarity"
+  time-ranges:
+    - "1h"
+    - "6h"
+    - "12h"
+    - "24h"
+    - "7d"
+    - "30d"
+    - "all"
 
 opensea:
   page-size: 300

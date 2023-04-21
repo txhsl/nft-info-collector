@@ -2,22 +2,23 @@ package api
 
 import (
 	"nft-info-collector/http"
-	"strconv"
 
 	"github.com/kataras/iris/v12"
 )
 
-func GetNFTInfo(ctx iris.Context) {
+func GetNFTDetail(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
 	// parse params
-	contract := ctx.Params().Get("contract")
+	contract := ctx.Params().GetString("contract")
 	if contract == "" {
 		ctx.StopWithStatus(iris.StatusBadRequest)
+		return
 	}
-	tokenID, err := strconv.Atoi(ctx.Params().Get("token_id"))
+	tokenID, err := ctx.Params().GetInt("token_id")
 	if err != nil {
 		ctx.StopWithStatus(iris.StatusBadRequest)
+		return
 	}
 
 	// fetch data
@@ -25,6 +26,7 @@ func GetNFTInfo(ctx iris.Context) {
 	if err != nil {
 		logger.Error("[HTTP] Failed to fetch nft info")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
 	}
 	ctx.WriteString(data)
 }

@@ -30,10 +30,18 @@ func main() {
 	}
 	collectionAPI := app.Party("/collection")
 	{
-		collectionAPI.Get("/update", api.UpdateCachedCollections)
-		collectionAPI.Get("/list", api.ListCachedCollections)
+		collectionAPI.Get("/update/{time_range}", api.UpdateCachedCollections)
+		collectionAPI.Get("/list/{time_range}/{keyword}/{asc:boolean}/{offset:int}/{limit:int}", api.ListCachedCollections)
+		collectionAPI.Get("/filter/{time_range}/{filter}/{value}/{offset:int}/{limit:int}", api.FilterCachedCollections)
 		collectionAPI.Get("/info/{contract}", api.GetCollectionInfo)
-		collectionAPI.Get("/info/{contract}/{token_id}", api.GetNFTInfo)
+		collectionAPI.Get("/metrics/{contract}", api.GetCollectionMetrics)
+		collectionAPI.Get("/detail/{slug}", api.GetCollectionDetail)
+		collectionAPI.Get("/nfts/{contract}/{offset:int}/{limit:int}", api.GetCollectionNFTs)
+	}
+	nftAPI := app.Party("/nft")
+	{
+		// Banned by Cloudflare with 1020 - Access denied
+		nftAPI.Get("/detail/{contract}/{token_id}", api.GetNFTDetail)
 	}
 	userAPI := app.Party("/user")
 	{
@@ -41,8 +49,8 @@ func main() {
 	}
 	searchAPI := app.Party("/search")
 	{
-		searchAPI.Get("/nfts/{keyword}", api.SearchNFTs)
-		searchAPI.Get("/collections/{keyword}", api.SearchCollections)
+		searchAPI.Get("/nfts/{contract}/{keyword}/{min}/{max}", api.SearchNFTs)
+		searchAPI.Get("/collections/{keyword}/{min}/{max}", api.SearchCollections)
 	}
 	app.Listen(config.Load().Port)
 }

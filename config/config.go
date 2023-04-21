@@ -11,9 +11,12 @@ type nftscan struct {
 }
 
 type nftgo struct {
-	ApiKey   string `yaml:"api-key"`
-	PageSize int    `yaml:"page-size"`
-	Limit    int    `yaml:"limit"`
+	ApiKey     string   `yaml:"api-key"`
+	PageSize   int      `yaml:"page-size"`
+	Limit      int      `yaml:"limit"`
+	Keywords   []string `yaml:"keywords"`
+	Filters    []string `yaml:"filters"`
+	TimeRanges []string `yaml:"time-ranges"`
 }
 
 type opensea struct {

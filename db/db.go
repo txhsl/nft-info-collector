@@ -3,9 +3,9 @@ package db
 import (
 	"context"
 	"nft-info-collector/config"
+	"strconv"
 
-	"github.com/kataras/golog"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -15,61 +15,20 @@ func Connect() (*mongo.Client, error) {
 	return mongo.Connect(context.TODO(), options)
 }
 
-func GetCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, offset int, limit int) ([]bson.M, error) {
-	// get collections
-	sort := bson.D{{Key: "volume", Value: -1}}
-	filter := bson.D{{}}
-	option := options.Find()
-	option.SetSort(sort)
-	option.SetSkip(int64(offset))
-	option.SetLimit(int64(limit))
-	cursor, err := coll.Find(ctx, filter, option)
-	if err != nil {
-		return nil, err
+func getSortValue(asc bool) int {
+	if asc {
+		return 1
 	}
-
-	// analysis result
-	results := []bson.M{}
-	if err = cursor.All(context.TODO(), &results); err != nil {
-		return nil, err
-	}
-	logger.Info("[DB] Collections searched:", len(results))
-	return results, nil
+	return -1
 }
 
-func ReplaceCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, collections []interface{}) error {
-	// delete old
-	filter := bson.D{{}}
-	delete, err := coll.DeleteMany(ctx, filter)
-	if err != nil {
-		return err
+func fitFilterType(filter primitive.M) (primitive.M, error) {
+	if filter["has_rarity"] != nil {
+		value, err := strconv.ParseBool(filter["has_rarity"].(string))
+		if err != nil {
+			return nil, err
+		}
+		filter["has_rarity"] = value
 	}
-	logger.Info("[DB] Collections deleted: ", delete.DeletedCount)
-
-	// insert new
-	insert, err := coll.InsertMany(ctx, collections)
-	if err != nil {
-		return err
-	}
-	logger.Info("[DB] Collections inserted: ", len(insert.InsertedIDs))
-	return nil
-}
-
-func UpdateCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, collections []interface{}) error {
-	models := []mongo.WriteModel{}
-	for _, collection := range collections {
-		// some problem, should find than decide update or insert
-		slug := collection.(map[string]interface{})["slug"]
-		models = append(models, mongo.NewReplaceOneModel().SetUpsert(true).SetFilter(bson.M{"slug": slug}).SetReplacement(collection))
-	}
-	if len(models) == 0 {
-		return nil
-	}
-
-	update, err := coll.BulkWrite(ctx, models)
-	if err != nil {
-		return err
-	}
-	logger.Info("[DB] Collections matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
-	return nil
+	return filter, nil
 }

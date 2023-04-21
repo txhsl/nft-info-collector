@@ -17,6 +17,7 @@ func ListImmediateTrends(ctx iris.Context) {
 	if err != nil {
 		logger.Error("[HTTP] Failed to fetch trends")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
 	}
 
 	// deserialize result
@@ -25,22 +26,14 @@ func ListImmediateTrends(ctx iris.Context) {
 	if err != nil {
 		logger.Error("[API] Failed to serialize collections")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
 	}
 
-	// connect db
-	dbClient, err := db.Connect()
-	if err != nil {
-		logger.Error("[DB] Failed to connect mongodb")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-	}
-	defer dbClient.Disconnect(context.TODO())
-
-	// cache result
-	coll := dbClient.Database("nft-info-collector").Collection("trends")
-	err = db.ReplaceCachedCollections(context.TODO(), logger, coll, collections)
+	err = db.ReplaceCachedTrends(context.TODO(), logger, collections)
 	if err != nil {
 		logger.Error("[DB] Failed to replace cached trends")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
 	}
 
 	ctx.WriteString(data)
@@ -49,20 +42,12 @@ func ListImmediateTrends(ctx iris.Context) {
 func ListCachedTrends(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
-	// connect db
-	client, err := db.Connect()
-	if err != nil {
-		logger.Error("[DB] Failed to connect mongodb")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-	}
-	defer client.Disconnect(context.TODO())
-
 	// search db
-	coll := client.Database("nft-info-collector").Collection("trends")
-	collections, err := db.GetCachedCollections(context.TODO(), logger, coll, 0, 100)
+	collections, err := db.GetCachedTrends(context.TODO(), logger, 0, 100)
 	if err != nil {
-		logger.Error("[API] Failed to read cached trends")
+		logger.Error("[DB] Failed to read cached trends")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
 	}
 
 	// serialize collections
@@ -70,6 +55,7 @@ func ListCachedTrends(ctx iris.Context) {
 	if err != nil {
 		logger.Error("[API] Failed to deserialize cached trends")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
 	}
 	ctx.WriteString(string(result))
 }
