@@ -36,7 +36,7 @@ func GetOpenSeaCollections(logger *golog.Logger, offset int, limit int) (string,
 	return gjson.Get(string(body), "collections").String(), nil
 }
 
-// Used in immediate response
+// Only used in DB cache
 func GetOpenSeaCollectionInfo(logger *golog.Logger, slug string) (string, error) {
 	// build request
 	httpClient := &http.Client{}

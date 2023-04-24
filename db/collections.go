@@ -20,7 +20,10 @@ func GetSortedCollections(ctx context.Context, logger *golog.Logger, timeRange s
 
 	// get collections
 	sort := bson.D{{Key: keyword, Value: getSortValue(asc)}}
-	filter := bson.D{{}}
+	filter, err := buildFilter(bson.D{{}}.Map())
+	if err != nil {
+		return nil, err
+	}
 	option := options.Find()
 	option.SetSort(sort)
 	option.SetSkip(int64(offset))
@@ -50,7 +53,7 @@ func GetFilteredCollections(ctx context.Context, logger *golog.Logger, timeRange
 
 	// get collections
 	sort := bson.D{{Key: "volume_eth", Value: -1}}
-	filter, err := fitFilterType(bson.M{flt: value})
+	filter, err := buildFilter(bson.M{flt: value})
 	if err != nil {
 		return nil, err
 	}
@@ -87,5 +90,23 @@ func UpdateCachedCollections(ctx context.Context, logger *golog.Logger, coll *mo
 		return err
 	}
 	logger.Info("[DB] Collections matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
+	return nil
+}
+
+func UpdateCachedCollectionDetails(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, details []map[string]interface{}) error {
+	models := []mongo.WriteModel{}
+	for _, detail := range details {
+		slug := detail["slug"]
+		models = append(models, mongo.NewReplaceOneModel().SetUpsert(true).SetFilter(bson.M{"slug": slug}).SetReplacement(detail))
+	}
+	if len(models) == 0 {
+		return nil
+	}
+
+	update, err := coll.BulkWrite(ctx, models)
+	if err != nil {
+		return err
+	}
+	logger.Info("[DB] Collection details matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
 	return nil
 }

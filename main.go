@@ -30,27 +30,26 @@ func main() {
 	}
 	collectionAPI := app.Party("/collection")
 	{
-		collectionAPI.Get("/update/{time_range}", api.UpdateCachedCollections)
-		collectionAPI.Get("/list/{time_range}/{keyword}/{asc:boolean}/{offset:int}/{limit:int}", api.ListCachedCollections)
+		collectionAPI.Get("/update/{time_range}", api.UpdateCachedCollectionInfos)
+		collectionAPI.Get("/update/details", api.UpdateCachedCollectionDetails)
+		collectionAPI.Get("/sort/{time_range}/{keyword}/{asc:boolean}/{offset:int}/{limit:int}", api.SortCachedCollections)
 		collectionAPI.Get("/filter/{time_range}/{filter}/{value}/{offset:int}/{limit:int}", api.FilterCachedCollections)
+		collectionAPI.Get("/search/{keyword}/{min}/{max}", api.SearchCollections)
+
 		collectionAPI.Get("/info/{contract}", api.GetCollectionInfo)
 		collectionAPI.Get("/metrics/{contract}", api.GetCollectionMetrics)
 		collectionAPI.Get("/detail/{slug}", api.GetCollectionDetail)
-		collectionAPI.Get("/nfts/{contract}/{offset:int}/{limit:int}", api.GetCollectionNFTs)
 	}
 	nftAPI := app.Party("/nft")
 	{
+		nftAPI.Get("/list/{contract}/{offset:int}/{limit:int}", api.GetCollectionNFTs)
+		nftAPI.Get("/search/{contract}/{keyword}/{min}/{max}", api.SearchNFTs)
 		// Banned by Cloudflare with 1020 - Access denied
 		nftAPI.Get("/detail/{contract}/{token_id}", api.GetNFTDetail)
 	}
 	userAPI := app.Party("/user")
 	{
 		userAPI.Get("/assets/{address}", api.GetUserNFTs)
-	}
-	searchAPI := app.Party("/search")
-	{
-		searchAPI.Get("/nfts/{contract}/{keyword}/{min}/{max}", api.SearchNFTs)
-		searchAPI.Get("/collections/{keyword}/{min}/{max}", api.SearchCollections)
 	}
 	app.Listen(config.Load().Port)
 }

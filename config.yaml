@@ -29,7 +29,7 @@ nftgo:
 
 opensea:
   page-size: 300
-  limit: 50000
+  limit: 6000
 
 mongodb:
   url: "mongodb://127.0.0.1:27017"

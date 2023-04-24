@@ -36,6 +36,7 @@ func GetNFTGoCollections(logger *golog.Logger, timeRange string, offset int, lim
 	return gjson.Get(string(body), "collections").String(), nil
 }
 
+// @deprecated
 func GetNFTGoCollectionInfo(logger *golog.Logger, contract string) (string, error) {
 	// build request
 	httpClient := &http.Client{}
@@ -62,6 +63,7 @@ func GetNFTGoCollectionInfo(logger *golog.Logger, contract string) (string, erro
 }
 
 // Used in immediate response
+// TODO: only use in DB cache
 func GetNFTGoCollectionMetrics(logger *golog.Logger, contract string) (string, error) {
 	// build request
 	httpClient := &http.Client{}

@@ -11,7 +11,8 @@ import (
 	"github.com/kataras/iris/v12"
 )
 
-func UpdateCachedCollections(ctx iris.Context) {
+// DB related, write
+func UpdateCachedCollectionInfos(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 	conf := config.Load().NFTGo
 
@@ -71,7 +72,78 @@ func UpdateCachedCollections(ctx iris.Context) {
 	ctx.WriteString("OK")
 }
 
-func ListCachedCollections(ctx iris.Context) {
+// DB related, write and read
+func UpdateCachedCollectionDetails(ctx iris.Context) {
+	logger := ctx.Application().Logger()
+	conf := config.Load().OpenSea
+
+	// connect db
+	dbClient, err := db.Connect()
+	if err != nil {
+		logger.Error("[DB] Failed to connect mongodb")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	defer dbClient.Disconnect(context.TODO())
+
+	// fetch details
+	coll := dbClient.Database("nft-info-collector").Collection("collections-detail")
+
+	for i := 0; i < conf.Limit; i += conf.PageSize {
+		// read db
+		result, err := db.GetSortedCollections(context.TODO(), logger, "all", "volume_usd", false, i, conf.PageSize)
+		if err != nil {
+			logger.Error("[DB] Failed to read cached collections")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+		data, err := json.Marshal(result)
+		if err != nil {
+			logger.Error("[API] Failed to deserialize cached collections")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+		var collections []map[string]interface{}
+		err = json.Unmarshal([]byte(data), &collections)
+		if err != nil {
+			logger.Error("[API] Failed to get collection slugs")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+
+		batch := []map[string]interface{}{}
+		for _, collection := range collections {
+			// fetch data
+			slug := collection["opensea_slug"].(string)
+			data, err := http.GetOpenSeaCollectionInfo(logger, slug)
+			if err != nil {
+				logger.Error("[HTTP] Failed to fetch collection info")
+				ctx.StopWithStatus(iris.StatusInternalServerError)
+				return
+			}
+
+			// deserialize result
+			var info map[string]interface{}
+			err = json.Unmarshal([]byte(data), &info)
+			if err != nil {
+				// skip if not found
+				continue
+			}
+			batch = append(batch, info)
+		}
+
+		// cache result
+		err = db.UpdateCachedCollectionDetails(context.TODO(), logger, coll, batch)
+		if err != nil {
+			logger.Error("[DB] Failed to update cached collection details")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+// DB related, read
+func SortCachedCollections(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 	conf := config.Load().NFTGo
 
@@ -134,6 +206,7 @@ func ListCachedCollections(ctx iris.Context) {
 	ctx.WriteString(string(result))
 }
 
+// DB related, read
 func FilterCachedCollections(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 	conf := config.Load().NFTGo
@@ -197,6 +270,7 @@ func FilterCachedCollections(ctx iris.Context) {
 	ctx.WriteString(string(result))
 }
 
+// TODO: read from db
 func GetCollectionDetail(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
@@ -217,6 +291,7 @@ func GetCollectionDetail(ctx iris.Context) {
 	ctx.WriteString(data)
 }
 
+// TODO: read from db
 func GetCollectionInfo(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
@@ -237,6 +312,7 @@ func GetCollectionInfo(ctx iris.Context) {
 	ctx.WriteString(data)
 }
 
+// TODO: update to cache, merge tables to one
 func GetCollectionMetrics(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
@@ -257,32 +333,6 @@ func GetCollectionMetrics(ctx iris.Context) {
 	ctx.WriteString(data)
 }
 
-func GetCollectionNFTs(ctx iris.Context) {
-	logger := ctx.Application().Logger()
+func SearchCollections(ctx iris.Context) {
 
-	// parse params
-	contract := ctx.Params().GetString("contract")
-	if contract == "" {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	offset, err := ctx.Params().GetInt("offset")
-	if err != nil {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	limit, err := ctx.Params().GetInt("limit")
-	if err != nil {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-
-	// fetch data
-	data, err := http.GetNFTGoCollectionNFTs(logger, contract, offset, limit)
-	if err != nil {
-		logger.Error("[HTTP] Failed to fetch collection nfts")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	ctx.WriteString(data)
 }
