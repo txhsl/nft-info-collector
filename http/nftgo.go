@@ -62,8 +62,8 @@ func GetNFTGoCollectionInfo(logger *golog.Logger, contract string) (string, erro
 	return string(body), nil
 }
 
-// Used in immediate response
-// TODO: only use in DB cache
+// Only used in DB cache
+// @deprecated
 func GetNFTGoCollectionMetrics(logger *golog.Logger, contract string) (string, error) {
 	// build request
 	httpClient := &http.Client{}

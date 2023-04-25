@@ -9,14 +9,14 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func GetSortedCollections(ctx context.Context, logger *golog.Logger, timeRange string, keyword string, asc bool, offset int, limit int) ([]bson.M, error) {
+func GetSortedCollectionIndex(ctx context.Context, logger *golog.Logger, keyword string, asc bool, offset int, limit int) ([]bson.M, error) {
 	// connect db
 	client, err := Connect()
 	if err != nil {
 		return nil, err
 	}
 	defer client.Disconnect(context.TODO())
-	coll := client.Database("nft-info-collector").Collection("collections-" + timeRange)
+	coll := client.Database("nft-info-collector").Collection("collection-index")
 
 	// get collections
 	sort := bson.D{{Key: keyword, Value: getSortValue(asc)}}
@@ -38,18 +38,18 @@ func GetSortedCollections(ctx context.Context, logger *golog.Logger, timeRange s
 	if err = cursor.All(context.TODO(), &results); err != nil {
 		return nil, err
 	}
-	logger.Info("[DB] Collections searched: ", len(results))
+	logger.Info("[DB] Index searched: ", len(results))
 	return results, nil
 }
 
-func GetFilteredCollections(ctx context.Context, logger *golog.Logger, timeRange string, flt string, value string, offset int, limit int) ([]bson.M, error) {
+func GetFilteredCollectionIndex(ctx context.Context, logger *golog.Logger, flt string, value string, offset int, limit int) ([]bson.M, error) {
 	// connect db
 	client, err := Connect()
 	if err != nil {
 		return nil, err
 	}
 	defer client.Disconnect(context.TODO())
-	coll := client.Database("nft-info-collector").Collection("collections-" + timeRange)
+	coll := client.Database("nft-info-collector").Collection("collection-index")
 
 	// get collections
 	sort := bson.D{{Key: "volume_eth", Value: -1}}
@@ -71,11 +71,11 @@ func GetFilteredCollections(ctx context.Context, logger *golog.Logger, timeRange
 	if err = cursor.All(context.TODO(), &results); err != nil {
 		return nil, err
 	}
-	logger.Info("[DB] Collections searched: ", len(results))
+	logger.Info("[DB] Index searched: ", len(results))
 	return results, nil
 }
 
-func UpdateCachedCollections(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, collections []interface{}) error {
+func UpdateCollectionIndex(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, collections []interface{}) error {
 	models := []mongo.WriteModel{}
 	for _, collection := range collections {
 		slug := collection.(map[string]interface{})["slug"]
@@ -89,24 +89,6 @@ func UpdateCachedCollections(ctx context.Context, logger *golog.Logger, coll *mo
 	if err != nil {
 		return err
 	}
-	logger.Info("[DB] Collections matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
-	return nil
-}
-
-func UpdateCachedCollectionDetails(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, details []map[string]interface{}) error {
-	models := []mongo.WriteModel{}
-	for _, detail := range details {
-		slug := detail["slug"]
-		models = append(models, mongo.NewReplaceOneModel().SetUpsert(true).SetFilter(bson.M{"slug": slug}).SetReplacement(detail))
-	}
-	if len(models) == 0 {
-		return nil
-	}
-
-	update, err := coll.BulkWrite(ctx, models)
-	if err != nil {
-		return err
-	}
-	logger.Info("[DB] Collection details matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
+	logger.Info("[DB] Index matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
 	return nil
 }

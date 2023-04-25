@@ -28,10 +28,14 @@ func main() {
 		trendsAPI.Get("/immediate", api.ListImmediateTrends)
 		trendsAPI.Get("/cached", api.ListCachedTrends)
 	}
+	updateAPI := app.Party("/update")
+	{
+		updateAPI.Get("/index", api.UpdateCachedCollectionIndex)
+		updateAPI.Get("/details", api.UpdateCachedCollectionDetails)
+		updateAPI.Get("/metrics", api.UpdateCachedCollectionMetrics)
+	}
 	collectionAPI := app.Party("/collection")
 	{
-		collectionAPI.Get("/update/{time_range}", api.UpdateCachedCollectionInfos)
-		collectionAPI.Get("/update/details", api.UpdateCachedCollectionDetails)
 		collectionAPI.Get("/sort/{time_range}/{keyword}/{asc:boolean}/{offset:int}/{limit:int}", api.SortCachedCollections)
 		collectionAPI.Get("/filter/{time_range}/{filter}/{value}/{offset:int}/{limit:int}", api.FilterCachedCollections)
 		collectionAPI.Get("/search/{keyword}/{min}/{max}", api.SearchCollections)

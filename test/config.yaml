@@ -27,9 +27,14 @@ nftgo:
     - "30d"
     - "all"
 
+reservoir:
+  api-key: "ef47b30f-3d0b-5de4-acad-3410f2c9d3a2"
+  page-size: 20
+  limit: 6000
+
 opensea:
   page-size: 300
-  limit: 50000
+  limit: 6000
 
 mongodb:
   url: "mongodb://127.0.0.1:27017"

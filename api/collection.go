@@ -12,23 +12,9 @@ import (
 )
 
 // DB related, write
-func UpdateCachedCollectionInfos(ctx iris.Context) {
+func UpdateCachedCollectionIndex(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 	conf := config.Load().NFTGo
-
-	// parse params
-	timeRange := ctx.Params().GetString("time_range")
-	isBadReq := true
-	for _, t := range conf.TimeRanges {
-		if t == timeRange {
-			isBadReq = false
-			break
-		}
-	}
-	if isBadReq {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
 
 	// connect db
 	dbClient, err := db.Connect()
@@ -38,11 +24,11 @@ func UpdateCachedCollectionInfos(ctx iris.Context) {
 		return
 	}
 	defer dbClient.Disconnect(context.TODO())
-	coll := dbClient.Database("nft-info-collector").Collection("collections-" + timeRange)
+	coll := dbClient.Database("nft-info-collector").Collection("collection-index")
 
 	for i := 0; i < conf.Limit; i += conf.PageSize {
 		// fetch data
-		data, err := http.GetNFTGoCollections(logger, timeRange, i, conf.PageSize)
+		data, err := http.GetNFTGoCollections(logger, "all", i, conf.PageSize)
 		if err != nil {
 			logger.Error("[HTTP] Failed to fetch collections")
 			ctx.StopWithStatus(iris.StatusInternalServerError)
@@ -59,17 +45,89 @@ func UpdateCachedCollectionInfos(ctx iris.Context) {
 		}
 
 		// cache result
-		err = db.UpdateCachedCollections(context.TODO(), logger, coll, collections)
+		err = db.UpdateCollectionIndex(context.TODO(), logger, coll, collections)
 		if err != nil {
 			logger.Error("[DB] Failed to update cached collections")
 			ctx.StopWithStatus(iris.StatusInternalServerError)
 			return
 		}
 
-		logger.Info("[DB] Collections updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
+		logger.Info("[DB] Index updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
 	}
 
 	ctx.WriteString("OK")
+}
+
+// DB related, write and read
+func UpdateCachedCollectionMetrics(ctx iris.Context) {
+	logger := ctx.Application().Logger()
+	conf := config.Load().Reservoir
+
+	// connect db
+	dbClient, err := db.Connect()
+	if err != nil {
+		logger.Error("[DB] Failed to connect mongodb")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	defer dbClient.Disconnect(context.TODO())
+
+	// fetch details
+	coll := dbClient.Database("nft-info-collector").Collection("collection-metrics")
+
+	for i := 0; i < conf.Limit; i += conf.PageSize {
+		// read db
+		result, err := db.GetSortedCollectionIndex(context.TODO(), logger, "volume_usd", false, i, conf.PageSize)
+		if err != nil {
+			logger.Error("[DB] Failed to read cached collections")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+		data, err := json.Marshal(result)
+		if err != nil {
+			logger.Error("[API] Failed to deserialize cached collections")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+		var batch []map[string]interface{}
+		err = json.Unmarshal([]byte(data), &batch)
+		if err != nil {
+			logger.Error("[API] Failed to get collection contracts")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+
+		contracts := make([]string, 0, len(batch))
+		for _, collection := range batch {
+			contract := collection["contracts"].([]interface{})[0].(string)
+			contracts = append(contracts, contract)
+		}
+		collections, err := http.GetReservoirCollections(logger, contracts)
+		if err != nil {
+			logger.Error("[HTTP] Failed to fetch collection info")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+
+		// deserialize result
+		var metrics []interface{}
+		err = json.Unmarshal([]byte(collections), &metrics)
+		if err != nil {
+			logger.Error("[API] Failed to serialize collections")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+
+		// cache result
+		err = db.UpdateCollectionMetrics(context.TODO(), logger, coll, metrics)
+		if err != nil {
+			logger.Error("[DB] Failed to update cached collection details")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+
+		logger.Info("[DB] Metrics updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
+	}
 }
 
 // DB related, write and read
@@ -87,11 +145,11 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 	defer dbClient.Disconnect(context.TODO())
 
 	// fetch details
-	coll := dbClient.Database("nft-info-collector").Collection("collections-detail")
+	coll := dbClient.Database("nft-info-collector").Collection("collection-details")
 
 	for i := 0; i < conf.Limit; i += conf.PageSize {
 		// read db
-		result, err := db.GetSortedCollections(context.TODO(), logger, "all", "volume_usd", false, i, conf.PageSize)
+		result, err := db.GetSortedCollectionIndex(context.TODO(), logger, "volume_usd", false, i, conf.PageSize)
 		if err != nil {
 			logger.Error("[DB] Failed to read cached collections")
 			ctx.StopWithStatus(iris.StatusInternalServerError)
@@ -133,16 +191,19 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 		}
 
 		// cache result
-		err = db.UpdateCachedCollectionDetails(context.TODO(), logger, coll, batch)
+		err = db.UpdateCollectionDetails(context.TODO(), logger, coll, batch)
 		if err != nil {
 			logger.Error("[DB] Failed to update cached collection details")
 			ctx.StopWithStatus(iris.StatusInternalServerError)
 			return
 		}
+
+		logger.Info("[DB] Details updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
 	}
 }
 
 // DB related, read
+// TODO: update
 func SortCachedCollections(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 	conf := config.Load().NFTGo
@@ -189,7 +250,7 @@ func SortCachedCollections(ctx iris.Context) {
 	}
 
 	// search db
-	collections, err := db.GetSortedCollections(context.TODO(), logger, timeRange, keyword, asc, offset, limit)
+	collections, err := db.GetSortedCollectionIndex(context.TODO(), logger, keyword, asc, offset, limit)
 	if err != nil {
 		logger.Error("[DB] Failed to read cached collections")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
@@ -207,6 +268,7 @@ func SortCachedCollections(ctx iris.Context) {
 }
 
 // DB related, read
+// TODO: update
 func FilterCachedCollections(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 	conf := config.Load().NFTGo
@@ -253,7 +315,7 @@ func FilterCachedCollections(ctx iris.Context) {
 	}
 
 	// search db
-	collections, err := db.GetFilteredCollections(context.TODO(), logger, timeRange, filter, value, offset, limit)
+	collections, err := db.GetFilteredCollectionIndex(context.TODO(), logger, filter, value, offset, limit)
 	if err != nil {
 		logger.Error("[DB] Failed to read cached collections")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
@@ -312,7 +374,7 @@ func GetCollectionInfo(ctx iris.Context) {
 	ctx.WriteString(data)
 }
 
-// TODO: update to cache, merge tables to one
+// TODO: update
 func GetCollectionMetrics(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
