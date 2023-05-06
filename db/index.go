@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/kataras/golog"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,44 +20,10 @@ func GetSortedCollectionIndex(ctx context.Context, logger *golog.Logger, keyword
 	coll := client.Database("nft-info-collector").Collection("collection-index")
 
 	// get collections
-	sort := bson.D{{Key: keyword, Value: getSortValue(asc)}}
-	filter, err := buildFilter(bson.D{{}}.Map())
-	if err != nil {
-		return nil, err
-	}
-	option := options.Find()
-	option.SetSort(sort)
-	option.SetSkip(int64(offset))
-	option.SetLimit(int64(limit))
-	cursor, err := coll.Find(ctx, filter, option)
-	if err != nil {
-		return nil, err
-	}
+	updateLimit := time.Now().Add(-time.Hour * 24).Unix()
+	sort := bson.M{keyword: getAscValue(asc)}
+	filter := bson.M{"last_updated": bson.M{"$gte": updateLimit}}
 
-	// analysis result
-	results := []bson.M{}
-	if err = cursor.All(context.TODO(), &results); err != nil {
-		return nil, err
-	}
-	logger.Info("[DB] Index searched: ", len(results))
-	return results, nil
-}
-
-func GetFilteredCollectionIndex(ctx context.Context, logger *golog.Logger, flt string, value string, offset int, limit int) ([]bson.M, error) {
-	// connect db
-	client, err := Connect()
-	if err != nil {
-		return nil, err
-	}
-	defer client.Disconnect(context.TODO())
-	coll := client.Database("nft-info-collector").Collection("collection-index")
-
-	// get collections
-	sort := bson.D{{Key: "volume_eth", Value: -1}}
-	filter, err := buildFilter(bson.M{flt: value})
-	if err != nil {
-		return nil, err
-	}
 	option := options.Find()
 	option.SetSort(sort)
 	option.SetSkip(int64(offset))

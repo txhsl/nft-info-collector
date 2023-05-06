@@ -11,12 +11,9 @@ type nftscan struct {
 }
 
 type nftgo struct {
-	ApiKey     string   `yaml:"api-key"`
-	PageSize   int      `yaml:"page-size"`
-	Limit      int      `yaml:"limit"`
-	Keywords   []string `yaml:"keywords"`
-	Filters    []string `yaml:"filters"`
-	TimeRanges []string `yaml:"time-ranges"`
+	ApiKey   string `yaml:"api-key"`
+	PageSize int    `yaml:"page-size"`
+	Limit    int    `yaml:"limit"`
 }
 
 type reservoir struct {
@@ -34,6 +31,13 @@ type mongodb struct {
 	Url string `yaml:"url"`
 }
 
+type keywords struct {
+	Ranges  []string `yaml:"ranges"`
+	Filters []string `yaml:"filters"`
+	Sorts   []string `yaml:"sorts"`
+	Times   []string `yaml:"times"`
+}
+
 type Config struct {
 	NFTScan   nftscan   `yaml:"nftscan"`
 	NFTGo     nftgo     `yaml:"nftgo"`
@@ -41,6 +45,7 @@ type Config struct {
 	OpenSea   opensea   `yaml:"opensea"`
 	MongoDB   mongodb   `yaml:"mongodb"`
 	Port      string    `yaml:"port"`
+	Keywords  keywords  `yaml:"keywords"`
 }
 
 func Load() Config {

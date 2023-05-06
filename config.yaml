@@ -5,27 +5,6 @@ nftgo:
   api-key: "ec2dc360-1e69-441a-8ebb-2fd520ecd1da"
   page-size: 50
   limit: 6000
-  keywords:
-    - "market_cap_eth"
-    - "market_cap_change_percentage"
-    - "volume_eth"
-    - "floor_price_eth"
-    - "whale_num"
-    - "holder_num"
-  filters:
-    - "blockchain"
-    - "name"
-    - "contract_type"
-    - "categories"
-    - "has_rarity"
-  time-ranges:
-    - "1h"
-    - "6h"
-    - "12h"
-    - "24h"
-    - "7d"
-    - "30d"
-    - "all"
 
 reservoir:
   api-key: "18bc0917-92ca-520a-b606-f14d60d9ebfe"
@@ -40,3 +19,27 @@ mongodb:
   url: "mongodb://127.0.0.1:27017"
 
 port: ":8080"
+
+keywords:
+  ranges:
+    - "floor_price"
+    - "sales_count"
+    - "royalty"
+    - "profit_margin"
+    - "owners_percentage"
+    - "collection_age"
+  filters:
+    - "name"
+    - "contract_type"
+    - "categories"
+    - "has_rarity"
+  sorts:
+    - "floor_price"
+    - "market_cap"
+    - "total_volume"
+    - "total_sales"
+    - "num_owners"
+  times:
+    - "1d"
+    - "7d"
+    - "30d"

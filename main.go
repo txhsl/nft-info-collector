@@ -36,13 +36,11 @@ func main() {
 	}
 	collectionAPI := app.Party("/collection")
 	{
-		collectionAPI.Get("/sort/{time_range}/{keyword}/{asc:boolean}/{offset:int}/{limit:int}", api.SortCachedCollections)
-		collectionAPI.Get("/filter/{time_range}/{filter}/{value}/{offset:int}/{limit:int}", api.FilterCachedCollections)
-		collectionAPI.Get("/search/{keyword}/{min}/{max}", api.SearchCollections)
+		collectionAPI.Get("/info/{contract}", api.GetCollectionInfo)       // From NFTGo, only brief info
+		collectionAPI.Get("/detail/{slug}", api.GetCollectionDetail)       // From Opensea, contains fees, stats (only happens on Opensea), traits, etc.
+		collectionAPI.Get("/metrics/{contract}", api.GetCollectionMetrics) // From Reservoir, provide a total stats from all marketplaces
 
-		collectionAPI.Get("/info/{contract}", api.GetCollectionInfo)
-		collectionAPI.Get("/metrics/{contract}", api.GetCollectionMetrics)
-		collectionAPI.Get("/detail/{slug}", api.GetCollectionDetail)
+		collectionAPI.Get("/search", api.SearchCollections)
 	}
 	nftAPI := app.Party("/nft")
 	{

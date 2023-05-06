@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"nft-info-collector/config"
 	"nft-info-collector/db"
 	"nft-info-collector/http"
+	"strconv"
+	"time"
 
 	"github.com/kataras/iris/v12"
 )
@@ -187,6 +190,40 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 				// skip if not found
 				continue
 			}
+
+			// type format
+			info["dev_seller_fee_basis_points"], err = strconv.Atoi(info["dev_seller_fee_basis_points"].(string))
+			if err != nil {
+				logger.Error("[HTTP] Failed to format dev_seller_fee_basis_points")
+				ctx.StopWithStatus(iris.StatusInternalServerError)
+				return
+			}
+			info["dev_buyer_fee_basis_points"], err = strconv.Atoi(info["dev_buyer_fee_basis_points"].(string))
+			if err != nil {
+				logger.Error("[HTTP] Failed to format dev_buyer_fee_basis_points")
+				ctx.StopWithStatus(iris.StatusInternalServerError)
+				return
+			}
+			// info["opensea_seller_fee_basis_points"], err = strconv.Atoi(info["opensea_seller_fee_basis_points"].(string))
+			// if err != nil {
+			// 	logger.Error("[HTTP] Failed to format opensea_seller_fee_basis_points")
+			// 	ctx.StopWithStatus(iris.StatusInternalServerError)
+			// 	return
+			// }
+			info["opensea_buyer_fee_basis_points"], err = strconv.Atoi(info["opensea_buyer_fee_basis_points"].(string))
+			if err != nil {
+				logger.Error("[HTTP] Failed to format opensea_buyer_fee_basis_points")
+				ctx.StopWithStatus(iris.StatusInternalServerError)
+				return
+			}
+			createdDate, err := time.Parse(time.RFC3339, info["created_date"].(string))
+			if err != nil {
+				logger.Error("[HTTP] Failed to format created_date")
+				ctx.StopWithStatus(iris.StatusInternalServerError)
+				return
+			}
+			info["created_date"] = createdDate.Unix()
+			info["last_updated"] = time.Now().Unix()
 			batch = append(batch, info)
 		}
 
@@ -202,137 +239,7 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 	}
 }
 
-// DB related, read
-// TODO: update
-func SortCachedCollections(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-	conf := config.Load().NFTGo
-
-	// parse params
-	timeRange := ctx.Params().GetString("time_range")
-	isBadReq := true
-	for _, t := range conf.TimeRanges {
-		if t == timeRange {
-			isBadReq = false
-			break
-		}
-	}
-	if isBadReq {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	keyword := ctx.Params().GetString("keyword")
-	isBadReq = true
-	for _, k := range conf.Keywords {
-		if k == keyword {
-			isBadReq = false
-			break
-		}
-	}
-	if isBadReq {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	asc, err := ctx.Params().GetBool("asc")
-	if err != nil {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	offset, err := ctx.Params().GetInt("offset")
-	if err != nil {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	limit, err := ctx.Params().GetInt("limit")
-	if err != nil {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-
-	// search db
-	collections, err := db.GetSortedCollectionIndex(context.TODO(), logger, keyword, asc, offset, limit)
-	if err != nil {
-		logger.Error("[DB] Failed to read cached collections")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-
-	// serialize result
-	result, err := json.Marshal(collections)
-	if err != nil {
-		logger.Error("[API] Failed to deserialize cached collections")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	ctx.WriteString(string(result))
-}
-
-// DB related, read
-// TODO: update
-func FilterCachedCollections(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-	conf := config.Load().NFTGo
-
-	// parse params
-	timeRange := ctx.Params().GetString("time_range")
-	isBadReq := true
-	for _, t := range conf.TimeRanges {
-		if t == timeRange {
-			isBadReq = false
-			break
-		}
-	}
-	if isBadReq {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	filter := ctx.Params().GetString("filter")
-	isBadReq = true
-	for _, f := range conf.Filters {
-		if f == filter {
-			isBadReq = false
-			break
-		}
-	}
-	if isBadReq {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	value := ctx.Params().GetString("value")
-	if value == "" {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	offset, err := ctx.Params().GetInt("offset")
-	if err != nil {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-	limit, err := ctx.Params().GetInt("limit")
-	if err != nil {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-
-	// search db
-	collections, err := db.GetFilteredCollectionIndex(context.TODO(), logger, filter, value, offset, limit)
-	if err != nil {
-		logger.Error("[DB] Failed to read cached collections")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-
-	// serialize result
-	result, err := json.Marshal(collections)
-	if err != nil {
-		logger.Error("[API] Failed to deserialize cached collections")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	ctx.WriteString(string(result))
-}
-
-// TODO: read from db
+// TODO: update and read from db
 func GetCollectionDetail(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
@@ -353,7 +260,7 @@ func GetCollectionDetail(ctx iris.Context) {
 	ctx.WriteString(data)
 }
 
-// TODO: read from db
+// TODO: update and read from db
 func GetCollectionInfo(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
@@ -374,7 +281,7 @@ func GetCollectionInfo(ctx iris.Context) {
 	ctx.WriteString(data)
 }
 
-// TODO: update
+// TODO: update and read from db
 func GetCollectionMetrics(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 
@@ -396,5 +303,93 @@ func GetCollectionMetrics(ctx iris.Context) {
 }
 
 func SearchCollections(ctx iris.Context) {
+	logger := ctx.Application().Logger()
+	conf := config.Load().Keywords
 
+	// filter params
+	keyword := ctx.URLParam("keyword")
+	timeRange := ctx.URLParam("time_range")
+	isBadReq := true
+	for _, t := range conf.Times {
+		if t == timeRange {
+			isBadReq = false
+			break
+		}
+	}
+	if isBadReq {
+		ctx.StopWithStatus(iris.StatusBadRequest)
+		return
+	}
+
+	// range params
+	floorPriceMin := ctx.URLParamIntDefault("floor_price_min", 0)
+	floorPriceMax := ctx.URLParamIntDefault("floor_price_max", math.MaxInt)
+	saleCountMin := ctx.URLParamIntDefault("sale_count_min", 0)
+	saleCountMax := ctx.URLParamIntDefault("sale_count_max", math.MaxInt)
+	royaltyMin := ctx.URLParamIntDefault("royalty_min", 0)
+	royaltyMax := ctx.URLParamIntDefault("royalty_max", 10000)
+	profitMarginMin := ctx.URLParamIntDefault("profit_margin_min", math.MinInt)
+	profitMarginMax := ctx.URLParamIntDefault("profit_margin_max", math.MaxInt)
+	ownerPercentageMin := ctx.URLParamIntDefault("owner_percentage_min", 0)
+	ownerPercentageMax := ctx.URLParamIntDefault("owner_percentage_max", 100)
+	collectionAgeMin := ctx.URLParamIntDefault("collection_age_min", 0)
+	collectionAgeMax := ctx.URLParamIntDefault("collection_age_max", math.MaxInt)
+
+	// sort params
+	sort := ctx.URLParamDefault("sort", "total_volume")
+	isBadReq = true
+	for _, s := range conf.Sorts {
+		if s == sort {
+			isBadReq = false
+			break
+		}
+	}
+	if isBadReq {
+		ctx.StopWithStatus(iris.StatusBadRequest)
+		return
+	}
+	asc := ctx.URLParamBoolDefault("asc", false)
+
+	// pagination params
+	offset := ctx.URLParamIntDefault("offset", 0)
+	limit := ctx.URLParamIntDefault("limit", 20)
+
+	// search
+	collections, err := db.SearchCollections(
+		context.TODO(),
+		logger,
+		timeRange,
+		floorPriceMin,
+		floorPriceMax,
+		saleCountMin,
+		saleCountMax,
+		royaltyMin,
+		royaltyMax,
+		profitMarginMin,
+		profitMarginMax,
+		ownerPercentageMin,
+		ownerPercentageMax,
+		collectionAgeMin,
+		collectionAgeMax,
+		keyword,
+		sort,
+		asc,
+		offset,
+		limit,
+	)
+	if err != nil {
+		logger.Error(err)
+		logger.Error("[DB] Failed to read cached collections")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+
+	// serialize result
+	result, err := json.Marshal(collections)
+	if err != nil {
+		logger.Error("[API] Failed to deserialize cached collections")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	ctx.WriteString(string(result))
 }

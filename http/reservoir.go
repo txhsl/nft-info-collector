@@ -13,13 +13,9 @@ import (
 func GetReservoirCollections(logger *golog.Logger, contracts []string) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://api.reservoir.tools/collections/v5?"
-	for i, contract := range contracts {
-		if i == 0 {
-			url += "contract=" + contract
-		} else {
-			url += "&contract=" + contract
-		}
+	url := "https://api.reservoir.tools/collections/v5?includeTopBid=true"
+	for _, contract := range contracts {
+		url += "&contract=" + contract
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
