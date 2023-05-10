@@ -57,8 +57,6 @@ func UpdateCachedCollectionIndex(ctx iris.Context) {
 
 		logger.Info("[DB] Index updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
 	}
-
-	ctx.WriteString("OK")
 }
 
 // DB related, write and read
@@ -148,7 +146,8 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 	defer dbClient.Disconnect(context.TODO())
 
 	// fetch details
-	coll := dbClient.Database("nft-info-collector").Collection("collection-details")
+	detailColl := dbClient.Database("nft-info-collector").Collection("collection-details")
+	offerColl := dbClient.Database("nft-info-collector").Collection("collection-offers")
 
 	for i := 0; i < conf.Limit; i += conf.PageSize {
 		// read db
@@ -172,9 +171,10 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 			return
 		}
 
-		batch := []map[string]interface{}{}
+		detailBatch := []map[string]interface{}{}
+		offerBatch := []map[string]interface{}{}
 		for _, collection := range collections {
-			// fetch data
+			// fetch detail
 			slug := collection["opensea_slug"].(string)
 			data, err := http.GetOpenSeaCollectionInfo(logger, slug)
 			if err != nil {
@@ -191,6 +191,14 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 				continue
 			}
 
+			// read last update time
+			lastUpdated, _ := db.GetOffersLastUpdated(context.TODO(), offerColl, slug)
+			oneDaySales := info["stats"].(map[string]interface{})["one_day_sales"].(float64)
+			if oneDaySales == 0 && lastUpdated >= time.Now().Add(-24*time.Hour).Unix() {
+				// skip if no sales in 24 hours
+				continue
+			}
+
 			// type format
 			info["dev_seller_fee_basis_points"], err = strconv.Atoi(info["dev_seller_fee_basis_points"].(string))
 			if err != nil {
@@ -204,12 +212,7 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 				ctx.StopWithStatus(iris.StatusInternalServerError)
 				return
 			}
-			// info["opensea_seller_fee_basis_points"], err = strconv.Atoi(info["opensea_seller_fee_basis_points"].(string))
-			// if err != nil {
-			// 	logger.Error("[HTTP] Failed to format opensea_seller_fee_basis_points")
-			// 	ctx.StopWithStatus(iris.StatusInternalServerError)
-			// 	return
-			// }
+			info["opensea_seller_fee_basis_points"] = int(info["opensea_seller_fee_basis_points"].(float64))
 			info["opensea_buyer_fee_basis_points"], err = strconv.Atoi(info["opensea_buyer_fee_basis_points"].(string))
 			if err != nil {
 				logger.Error("[HTTP] Failed to format opensea_buyer_fee_basis_points")
@@ -223,14 +226,57 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 				return
 			}
 			info["created_date"] = createdDate.Unix()
+
+			// add total royalty
+			if info["is_creator_fees_enforced"].(bool) {
+				info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int) + info["dev_seller_fee_basis_points"].(int)
+			} else {
+				info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int)
+			}
+			// add last updated time
 			info["last_updated"] = time.Now().Unix()
-			batch = append(batch, info)
+			detailBatch = append(detailBatch, info)
+
+			// fetch collection offers if enabled
+			if info["is_collection_offers_enabled"].(bool) {
+				data, err := http.GetOpenSeaCollectionOffers(logger, slug)
+				if err != nil {
+					logger.Error("[HTTP] Failed to fetch collection offers")
+					ctx.StopWithStatus(iris.StatusInternalServerError)
+					return
+				}
+
+				// deserialize result
+				var offers []interface{}
+				err = json.Unmarshal([]byte(data), &offers)
+				if err != nil {
+					// skip if not found
+					continue
+				}
+
+				// build doc
+				doc := map[string]interface{}{}
+				doc["slug"] = slug
+				if len(offers) > 5 {
+					doc["offers"] = offers[0:5]
+				} else {
+					doc["offers"] = offers
+				}
+				doc["last_updated"] = time.Now().Unix()
+				offerBatch = append(offerBatch, doc)
+			}
 		}
 
 		// cache result
-		err = db.UpdateCollectionDetails(context.TODO(), logger, coll, batch)
+		err = db.UpdateCollectionDetails(context.TODO(), logger, detailColl, detailBatch)
 		if err != nil {
 			logger.Error("[DB] Failed to update cached collection details")
+			ctx.StopWithStatus(iris.StatusInternalServerError)
+			return
+		}
+		err = db.UpdateCollectionOffers(context.TODO(), logger, offerColl, offerBatch)
+		if err != nil {
+			logger.Error("[DB] Failed to update cached collection offers")
 			ctx.StopWithStatus(iris.StatusInternalServerError)
 			return
 		}
@@ -384,12 +430,5 @@ func SearchCollections(ctx iris.Context) {
 		return
 	}
 
-	// serialize result
-	result, err := json.Marshal(collections)
-	if err != nil {
-		logger.Error("[API] Failed to deserialize cached collections")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	ctx.WriteString(string(result))
+	ctx.JSON(collections)
 }

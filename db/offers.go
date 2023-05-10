@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func GetCollectionLastUpdated(ctx context.Context, coll *mongo.Collection, slug string) (int64, error) {
+func GetOffersLastUpdated(ctx context.Context, coll *mongo.Collection, slug string) (int64, error) {
 	filter := bson.M{"slug": slug}
 	option := options.FindOne().SetProjection(bson.M{"last_updated": 1})
 	result := coll.FindOne(ctx, filter, option)
@@ -23,11 +23,11 @@ func GetCollectionLastUpdated(ctx context.Context, coll *mongo.Collection, slug 
 	return collection["last_updated"].(int64), nil
 }
 
-func UpdateCollectionDetails(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, details []map[string]interface{}) error {
+func UpdateCollectionOffers(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, offers []map[string]interface{}) error {
 	models := []mongo.WriteModel{}
-	for _, detail := range details {
-		slug := detail["slug"]
-		models = append(models, mongo.NewReplaceOneModel().SetUpsert(true).SetFilter(bson.M{"slug": slug}).SetReplacement(detail))
+	for _, collection := range offers {
+		slug := collection["slug"]
+		models = append(models, mongo.NewReplaceOneModel().SetUpsert(true).SetFilter(bson.M{"slug": slug}).SetReplacement(collection))
 	}
 	if len(models) == 0 {
 		return nil
@@ -37,6 +37,6 @@ func UpdateCollectionDetails(ctx context.Context, logger *golog.Logger, coll *mo
 	if err != nil {
 		return err
 	}
-	logger.Info("[DB] Details matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
+	logger.Info("[DB] Offers matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
 	return nil
 }

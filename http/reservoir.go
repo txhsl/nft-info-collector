@@ -10,6 +10,7 @@ import (
 )
 
 // Only used in DB cache
+// @deprecated
 func GetReservoirCollections(logger *golog.Logger, contracts []string) (string, error) {
 	// build request
 	httpClient := &http.Client{}

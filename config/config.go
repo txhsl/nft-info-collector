@@ -23,8 +23,9 @@ type reservoir struct {
 }
 
 type opensea struct {
-	PageSize int `yaml:"page-size"`
-	Limit    int `yaml:"limit"`
+	ApiKey   string `yaml:"api-key"`
+	PageSize int    `yaml:"page-size"`
+	Limit    int    `yaml:"limit"`
 }
 
 type mongodb struct {

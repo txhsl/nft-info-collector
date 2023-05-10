@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/kataras/golog"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,9 +19,8 @@ func GetSortedCollectionIndex(ctx context.Context, logger *golog.Logger, keyword
 	coll := client.Database("nft-info-collector").Collection("collection-index")
 
 	// get collections
-	updateLimit := time.Now().Add(-time.Hour * 24).Unix()
 	sort := bson.M{keyword: getAscValue(asc)}
-	filter := bson.M{"last_updated": bson.M{"$gte": updateLimit}}
+	filter := bson.D{{}}
 
 	option := options.Find()
 	option.SetSort(sort)

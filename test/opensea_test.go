@@ -38,6 +38,20 @@ func TestGetOpenSeaCollectionInfo(t *testing.T) {
 	}
 }
 
+func TestGetOpenSeaCollectionOffers(t *testing.T) {
+	logger := iris.New().Logger()
+	data, err := http.GetOpenSeaCollectionOffers(logger, "doodles-official")
+	if err != nil {
+		t.Error(err)
+	}
+
+	var offers []interface{}
+	err = json.Unmarshal([]byte(data), &offers)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 // Banned by Cloudflare with 1020 - Access denied
 func TestGetOpenSeaAsset(t *testing.T) {
 	logger := iris.New().Logger()

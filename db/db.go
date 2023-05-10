@@ -2,9 +2,7 @@ package db
 
 import (
 	"context"
-	"math"
 	"nft-info-collector/config"
-	"time"
 
 	"github.com/kataras/golog"
 	"go.mongodb.org/mongo-driver/bson"
@@ -34,19 +32,6 @@ func getDetailTimePrefix(timeRange string) string {
 		return "thirty_day_"
 	default:
 		return "one_day_"
-	}
-}
-
-func getMetricTimePrefix(timeRange string) string {
-	switch timeRange {
-	case "1d":
-		return "1day"
-	case "7d":
-		return "7day"
-	case "30d":
-		return "30day"
-	default:
-		return "1d"
 	}
 }
 
@@ -83,7 +68,7 @@ func SearchCollections(
 	// get collections
 	pipeline := []bson.M{}
 
-	// match name & slug, last updated
+	// match name & slug
 	if flt != "" {
 		pipeline = append(pipeline, bson.M{
 			"$match": bson.M{
@@ -93,80 +78,78 @@ func SearchCollections(
 			},
 		})
 	}
+	// total supply, schema name, collection offers enabled, floor price, sale count, collection age, royalty, profit margin, owner percentage
 	pipeline = append(pipeline, bson.M{
 		"$match": bson.M{
 			"stats.total_supply": bson.M{
 				"$gt": 0,
 			},
-			"last_updated": bson.M{
-				"$gte": time.Now().Add(-time.Hour * 24).Unix(),
+			"primary_asset_contracts.0.schema_name": bson.M{
+				"$eq": "ERC721",
+			},
+			"is_collection_offers_enabled": true,
+			"stats.floor_price": bson.M{
+				"$gte": floorPriceMin,
+				"$lte": floorPriceMax,
+			},
+			"stats." + getDetailTimePrefix(timeRange) + "sales": bson.M{
+				"$gte": saleCountMin,
+				"$lte": saleCountMax,
+			},
+			"created_date": bson.M{
+				"$gte": collectionAgeMin,
+				"$lte": collectionAgemax,
+			},
+			"total_royalty": bson.M{
+				"$gte": royaltyMin,
+				"$lte": royaltyMax,
 			},
 		},
 	})
 
-	// floor price
-	if floorPriceMin != 0 || floorPriceMax != math.MaxInt {
-		pipeline = append(pipeline, bson.M{
-			"$match": bson.M{
-				"stats.floor_price": bson.M{
-					"$gte": floorPriceMin,
-					"$lte": floorPriceMax,
-				},
-			},
-		})
-	}
-
-	// sale count
-	if saleCountMin != 0 || saleCountMax != math.MaxInt {
-		pipeline = append(pipeline, bson.M{
-			"$match": bson.M{
-				"stats." + getDetailTimePrefix(timeRange) + "sales": bson.M{
-					"$gte": saleCountMin,
-					"$lte": saleCountMax,
-				},
-			},
-		})
-	}
-
-	// collection age
-	if collectionAgeMin != 0 || collectionAgemax != math.MaxInt {
-		pipeline = append(pipeline, bson.M{
-			"$match": bson.M{
-				"created_date": bson.M{
-					"$gte": collectionAgeMin,
-					"$lte": collectionAgemax,
-				},
-			},
-		})
-	}
-
 	// join metrics
 	pipeline = append(pipeline, bson.M{
 		"$lookup": bson.M{
-			"from":         "collection-metrics",
+			"from":         "collection-offers",
 			"localField":   "slug",
 			"foreignField": "slug",
-			"as":           "metrics",
+			"as":           "collection_offers",
 		},
 	})
 	pipeline = append(pipeline, bson.M{
 		"$replaceRoot": bson.M{
 			"newRoot": bson.M{
-				"$mergeObjects": bson.A{"$$ROOT", bson.M{"$arrayElemAt": bson.A{"$metrics", 0}}},
+				"$mergeObjects": bson.A{"$$ROOT", bson.M{"$arrayElemAt": bson.A{"$collection_offers", 0}}},
 			},
 		},
 	})
 	pipeline = append(pipeline, bson.M{
 		"$project": bson.M{
-			"metrics": 0,
+			"collection_offers": 0,
 		},
 	})
 
-	// only erc721
+	// pop top bid
 	pipeline = append(pipeline, bson.M{
-		"$match": bson.M{
-			"contractKind": bson.M{
-				"$eq": "erc721",
+		"$addFields": bson.M{
+			"top_offer": bson.M{
+				"$first": "$offers",
+			},
+		},
+	})
+	pipeline = append(pipeline, bson.M{
+		"$addFields": bson.M{
+			"top_bid": bson.M{
+				"$first": "$top_offer.protocol_data.parameters.offer",
+			},
+		},
+	})
+	pipeline = append(pipeline, bson.M{
+		"$addFields": bson.M{
+			"top_bid_price": bson.M{
+				"$divide": bson.A{bson.M{
+					"$toDecimal": "$top_bid.endAmount",
+				}, 1000000000000000000},
 			},
 		},
 	})
@@ -174,68 +157,40 @@ func SearchCollections(
 	// add fields
 	pipeline = append(pipeline, bson.M{
 		"$addFields": bson.M{
-			"total_royalty": bson.M{
-				"$add": bson.A{"$opensea_seller_fee_basis_points", "$dev_seller_fee_basis_points"},
-			},
 			"owners_percentage": bson.M{
 				"$multiply": bson.A{100, bson.M{
 					"$divide": bson.A{"$stats.num_owners", "$stats.total_supply"},
 				}},
 			},
 			"profit_margin": bson.M{
-				"$subtract": bson.A{bson.M{
-					"$multiply": bson.A{"$floorAsk.price.amount.decimal", bson.M{
-						"$subtract": bson.A{1, bson.M{
-							"$divide": bson.A{"$dev_seller_fee_basis_points", 10000},
+				"$subtract": bson.A{
+					bson.M{
+						"$multiply": bson.A{"$stats.floor_price", bson.M{
+							"$subtract": bson.A{1, bson.M{
+								"$divide": bson.A{"$total_royalty", 10000},
+							}},
 						}},
-					}},
-				}, "$topBid.price.amount.decimal"},
+					},
+					"$top_bid_price",
+				},
 			},
 		},
 	})
 
-	// royalty
-	if royaltyMin != 0 || royaltyMax != 10000 {
-		pipeline = append(pipeline, bson.M{
-			"$match": bson.M{
-				"total_royalty": bson.M{
-					"$gte": royaltyMin,
-					"$lte": royaltyMax,
-				},
-			},
-		})
-	}
-
-	// owner percentage
-	if ownerPercentageMin != 0 || ownerPercentageMax != 100 {
-		pipeline = append(pipeline, bson.M{
-			"$match": bson.M{
-				"owners_percentage": bson.M{
-					"$gte": ownerPercentageMin,
-					"$lte": ownerPercentageMax,
-				},
-			},
-		})
-	}
-
-	// profit margin
-	if profitMarginMin != math.MinInt || profitMarginMax != math.MaxInt {
-		pipeline = append(pipeline, bson.M{
-			"$match": bson.M{
-				"profit_margin": bson.M{
-					"$gte": profitMarginMin,
-					"$lte": profitMarginMax,
-				},
-			},
-		})
-	}
-
-	// project
+	// owner percentage, profit margin
 	pipeline = append(pipeline, bson.M{
-		"$project": bson.M{
-			"_id": 0,
+		"$match": bson.M{
+			"owners_percentage": bson.M{
+				"$gte": ownerPercentageMin,
+				"$lte": ownerPercentageMax,
+			},
+			"profit_margin": bson.M{
+				"$gte": profitMarginMin,
+				"$lte": profitMarginMax,
+			},
 		},
 	})
+
 	// sort
 	pipeline = append(pipeline, bson.M{
 		"$sort": bson.M{
@@ -250,6 +205,33 @@ func SearchCollections(
 	pipeline = append(pipeline, bson.M{
 		"$limit": limit,
 	})
+	pipeline = append(pipeline, bson.M{
+		"$replaceRoot": bson.M{
+			"newRoot": bson.M{
+				"$mergeObjects": bson.A{"$stats", "$$ROOT"},
+			},
+		},
+	})
+	// project
+	pipeline = append(pipeline, bson.M{
+		"$project": bson.M{
+			"_id":                  0,
+			"name":                 1,
+			"slug":                 1,
+			"image_url":            1,
+			"total_supply":         1,
+			"total_royalty":        1,
+			"floor_price":          1,
+			"total_volume":         1,
+			"one_day_sales":        1,
+			"one_day_sales_change": 1,
+			"owners_percentage":    1,
+			"top_bid_price":        1,
+			"profit_margin":        1,
+			"last_updated":         1,
+		},
+	})
+
 	cursor, err := coll.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err

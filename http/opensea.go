@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"nft-info-collector/config"
 
 	"github.com/kataras/golog"
 	"github.com/tidwall/gjson"
@@ -59,6 +60,31 @@ func GetOpenSeaCollectionInfo(logger *golog.Logger, slug string) (string, error)
 		return "", err
 	}
 	return gjson.Get(string(body), "collection").String(), nil
+}
+
+func GetOpenSeaCollectionOffers(logger *golog.Logger, slug string) (string, error) {
+	// build request
+	httpClient := &http.Client{}
+	url := "https://api.opensea.io/v2/offers/collection/" + slug + "?format=json"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("X-API-KEY", config.Load().OpenSea.ApiKey)
+
+	// send request
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	// analysis response
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	return gjson.Get(string(body), "offers").String(), nil
 }
 
 // Used in immediate response
