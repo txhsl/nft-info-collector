@@ -22,3 +22,33 @@ func TestGetReservoirCollections(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestGetReservoirCollectionListing(t *testing.T) {
+	logger := iris.New().Logger()
+	contract := "0x8d04a8c79ceb0889bdd12acdf3fa9d207ed3ff63"
+	data, err := http.GetReservoirCollectionListing(logger, contract)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var offers []interface{}
+	err = json.Unmarshal([]byte(data), &offers)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetReservoirCollectionDaily(t *testing.T) {
+	logger := iris.New().Logger()
+	contract := "0x8d04a8c79ceb0889bdd12acdf3fa9d207ed3ff63"
+	data, err := http.GetReservoirCollectionDaily(logger, contract)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var graph []interface{}
+	err = json.Unmarshal([]byte(data), &graph)
+	if err != nil {
+		t.Error(err)
+	}
+}
