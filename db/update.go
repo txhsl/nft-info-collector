@@ -70,6 +70,25 @@ func UpdateCollectionDetails(ctx context.Context, logger *golog.Logger, coll *mo
 	return nil
 }
 
+func UpdateCollectionDetail(ctx context.Context, logger *golog.Logger, detail map[string]interface{}) error {
+	// connect db
+	client, err := Connect()
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(context.Background())
+	coll := client.Database("nft-info-collector").Collection("collection-details")
+
+	// update
+	slug := detail["slug"]
+	update, err := coll.UpdateOne(ctx, bson.M{"slug": slug}, bson.M{"$set": detail})
+	if err != nil {
+		return err
+	}
+	logger.Info("[DB] Details matched: ", update.MatchedCount, ", modified: ", update.ModifiedCount)
+	return nil
+}
+
 func UpdateCollectionMetrics(ctx context.Context, logger *golog.Logger, coll *mongo.Collection, collections []interface{}) error {
 	models := []mongo.WriteModel{}
 	for _, collection := range collections {
@@ -103,5 +122,24 @@ func UpdateCollectionOffers(ctx context.Context, logger *golog.Logger, coll *mon
 		return err
 	}
 	logger.Info("[DB] Offers matched: ", update.MatchedCount, ", upserted: ", update.UpsertedCount, ", modified: ", update.ModifiedCount, ", deleted: ", update.DeletedCount, ", inserted: ", update.InsertedCount)
+	return nil
+}
+
+func UpdateCollectionOffer(ctx context.Context, logger *golog.Logger, offers map[string]interface{}) error {
+	// connect db
+	client, err := Connect()
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(context.Background())
+	coll := client.Database("nft-info-collector").Collection("collection-offers")
+
+	// update
+	slug := offers["slug"]
+	update, err := coll.UpdateOne(ctx, bson.M{"slug": slug}, bson.M{"$set": offers})
+	if err != nil {
+		return err
+	}
+	logger.Info("[DB] Offers matched: ", update.MatchedCount, ", modified: ", update.ModifiedCount)
 	return nil
 }

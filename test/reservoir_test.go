@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kataras/iris/v12"
+	"github.com/tidwall/gjson"
 )
 
 func TestGetReservoirCollections(t *testing.T) {
@@ -17,7 +18,7 @@ func TestGetReservoirCollections(t *testing.T) {
 	}
 
 	var collections []interface{}
-	err = json.Unmarshal([]byte(data), &collections)
+	err = json.Unmarshal([]byte(gjson.Get(data, "collections").String()), &collections)
 	if err != nil {
 		t.Error(err)
 	}
@@ -32,7 +33,7 @@ func TestGetReservoirCollectionListing(t *testing.T) {
 	}
 
 	var offers []interface{}
-	err = json.Unmarshal([]byte(data), &offers)
+	err = json.Unmarshal([]byte(gjson.Get(data, "orders").String()), &offers)
 	if err != nil {
 		t.Error(err)
 	}
@@ -47,7 +48,7 @@ func TestGetReservoirCollectionDaily(t *testing.T) {
 	}
 
 	var graph []interface{}
-	err = json.Unmarshal([]byte(data), &graph)
+	err = json.Unmarshal([]byte(gjson.Get(data, "collections").String()), &graph)
 	if err != nil {
 		t.Error(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kataras/iris/v12"
+	"github.com/tidwall/gjson"
 )
 
 func TestGetOpenSeaCollections(t *testing.T) {
@@ -18,7 +19,7 @@ func TestGetOpenSeaCollections(t *testing.T) {
 	}
 
 	var collections []interface{}
-	err = json.Unmarshal([]byte(data), &collections)
+	err = json.Unmarshal([]byte(gjson.Get(data, "collections").String()), &collections)
 	if err != nil {
 		t.Error(err)
 	}
@@ -32,7 +33,7 @@ func TestGetOpenSeaCollectionInfo(t *testing.T) {
 	}
 
 	var collection map[string]interface{}
-	err = json.Unmarshal([]byte(data), &collection)
+	err = json.Unmarshal([]byte(gjson.Get(data, "collection").String()), &collection)
 	if err != nil {
 		t.Error(err)
 	}
@@ -46,7 +47,21 @@ func TestGetOpenSeaCollectionOffers(t *testing.T) {
 	}
 
 	var offers []interface{}
-	err = json.Unmarshal([]byte(data), &offers)
+	err = json.Unmarshal([]byte(gjson.Get(data, "offers").String()), &offers)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetOpenSeaCollectionRecentSales(t *testing.T) {
+	logger := iris.New().Logger()
+	data, err := http.GetOpenSeaCollectionRecentSales(logger, "doodles-official")
+	if err != nil {
+		t.Error(err)
+	}
+
+	var sales []interface{}
+	err = json.Unmarshal([]byte(gjson.Get(data, "asset_events").String()), &sales)
 	if err != nil {
 		t.Error(err)
 	}
@@ -69,13 +84,13 @@ func TestGetOpenSeaAsset(t *testing.T) {
 
 func TestGetOpenSeaAssets(t *testing.T) {
 	logger := iris.New().Logger()
-	data, err := http.GetOpenSeaUserAssets(logger, "0x480dd671880768D24317FA965D00f43D25868892")
+	data, err := http.GetOpenSeaUserAssets(logger, "0x480dd671880768D24317FA965D00f43D25868892", "")
 	if err != nil {
 		t.Error(err)
 	}
 
 	var assets []interface{}
-	err = json.Unmarshal([]byte(data), &assets)
+	err = json.Unmarshal([]byte(gjson.Get(data, "assets").String()), &assets)
 	if err != nil {
 		t.Error(err)
 	}

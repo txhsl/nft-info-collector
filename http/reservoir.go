@@ -6,7 +6,6 @@ import (
 	"nft-info-collector/config"
 
 	"github.com/kataras/golog"
-	"github.com/tidwall/gjson"
 )
 
 // Only used in DB cache
@@ -37,7 +36,7 @@ func GetReservoirCollections(logger *golog.Logger, contracts []string) (string, 
 		return "", err
 	}
 
-	return gjson.Get(string(body), "collections").String(), nil
+	return string(body), nil
 }
 
 func GetReservoirCollectionListing(logger *golog.Logger, contract string) (string, error) {
@@ -63,7 +62,7 @@ func GetReservoirCollectionListing(logger *golog.Logger, contract string) (strin
 		return "", err
 	}
 
-	return gjson.Get(string(body), "orders").String(), nil
+	return string(body), nil
 }
 
 func GetReservoirCollectionDaily(logger *golog.Logger, contract string) (string, error) {
@@ -89,5 +88,5 @@ func GetReservoirCollectionDaily(logger *golog.Logger, contract string) (string,
 		return "", err
 	}
 
-	return gjson.Get(string(body), "collections").String(), nil
+	return string(body), nil
 }

@@ -36,16 +36,12 @@ func main() {
 	}
 	collectionAPI := app.Party("/collection")
 	{
-		collectionAPI.Get("/info/{contract}", api.GetCollectionInfo)       // From NFTGo, only brief info
-		collectionAPI.Get("/detail/{slug}", api.GetCollectionDetail)       // From Opensea, contains fees, stats (only happens on Opensea), traits, etc.
-		collectionAPI.Get("/metrics/{contract}", api.GetCollectionMetrics) // From Reservoir, provide a total stats from all marketplaces
-
 		collectionAPI.Get("/search", api.SearchCollections)
+		collectionAPI.Get("/detail/{slug}", api.GetCollectionDetail)
 	}
 	nftAPI := app.Party("/nft")
 	{
-		nftAPI.Get("/list/{contract}/{offset:int}/{limit:int}", api.GetCollectionNFTs)
-		nftAPI.Get("/search/{contract}/{keyword}/{min}/{max}", api.SearchNFTs)
+		nftAPI.Get("/list/{contract}", api.GetCollectionNFTs)
 		// Banned by Cloudflare with 1020 - Access denied
 		nftAPI.Get("/detail/{contract}/{token_id}", api.GetNFTDetail)
 	}

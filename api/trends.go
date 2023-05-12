@@ -7,6 +7,7 @@ import (
 	"nft-info-collector/http"
 
 	"github.com/kataras/iris/v12"
+	"github.com/tidwall/gjson"
 )
 
 func ListImmediateTrends(ctx iris.Context) {
@@ -22,7 +23,7 @@ func ListImmediateTrends(ctx iris.Context) {
 
 	// deserialize result
 	var collections []interface{}
-	err = json.Unmarshal([]byte(data), &collections)
+	err = json.Unmarshal([]byte(gjson.Get(data, "data").String()), &collections)
 	if err != nil {
 		logger.Error("[API] Failed to serialize collections")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
@@ -36,7 +37,7 @@ func ListImmediateTrends(ctx iris.Context) {
 		return
 	}
 
-	ctx.WriteString(data)
+	ctx.JSON(map[string]interface{}{"trends": collections})
 }
 
 func ListCachedTrends(ctx iris.Context) {
@@ -50,12 +51,5 @@ func ListCachedTrends(ctx iris.Context) {
 		return
 	}
 
-	// serialize collections
-	result, err := json.Marshal(collections)
-	if err != nil {
-		logger.Error("[API] Failed to deserialize cached trends")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	ctx.WriteString(string(result))
+	ctx.JSON(map[string]interface{}{"trends": collections})
 }

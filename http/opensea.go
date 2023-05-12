@@ -7,7 +7,6 @@ import (
 	"nft-info-collector/config"
 
 	"github.com/kataras/golog"
-	"github.com/tidwall/gjson"
 )
 
 // Only used in DB cache
@@ -34,7 +33,7 @@ func GetOpenSeaCollections(logger *golog.Logger, offset int, limit int) (string,
 	if err != nil {
 		return "", err
 	}
-	return gjson.Get(string(body), "collections").String(), nil
+	return string(body), nil
 }
 
 // Only used in DB cache
@@ -59,7 +58,7 @@ func GetOpenSeaCollectionInfo(logger *golog.Logger, slug string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return gjson.Get(string(body), "collection").String(), nil
+	return string(body), nil
 }
 
 func GetOpenSeaCollectionOffers(logger *golog.Logger, slug string) (string, error) {
@@ -84,18 +83,18 @@ func GetOpenSeaCollectionOffers(logger *golog.Logger, slug string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	return gjson.Get(string(body), "offers").String(), nil
+	return string(body), nil
 }
 
-// Used in immediate response
-func GetOpenSeaAsset(logger *golog.Logger, contract string, id int) (string, error) {
+func GetOpenSeaCollectionRecentSales(logger *golog.Logger, slug string) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://api.opensea.io/api/v1/asset/" + contract + "/" + fmt.Sprint(id) + "/?format=json&include_orders=false"
+	url := "https://api.opensea.io/api/v1/events?collection_slug=" + slug + "&event_type=successful&only_opensea=true"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
 	}
+	req.Header.Add("X-API-KEY", config.Load().OpenSea.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
@@ -113,14 +112,15 @@ func GetOpenSeaAsset(logger *golog.Logger, contract string, id int) (string, err
 }
 
 // Used in immediate response
-func GetOpenSeaUserAssets(logger *golog.Logger, account string) (string, error) {
+func GetOpenSeaAsset(logger *golog.Logger, contract string, id int) (string, error) {
 	// build request
 	httpClient := &http.Client{}
-	url := "https://api.opensea.io/api/v1/assets?format=json&owner=" + account
+	url := "https://api.opensea.io/api/v1/asset/" + contract + "/" + fmt.Sprint(id) + "/?format=json&include_orders=false"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
 	}
+	req.Header.Add("X-API-KEY", config.Load().OpenSea.ApiKey)
 
 	// send request
 	res, err := httpClient.Do(req)
@@ -134,35 +134,34 @@ func GetOpenSeaUserAssets(logger *golog.Logger, account string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	assets := gjson.Get(string(body), "assets").Array()
-	cursor := gjson.Get(string(body), "next")
+	return string(body), nil
+}
 
-	// get left pages
-	for {
-		if cursor.Value() == nil {
-			break
-		}
-		url = "https://api.opensea.io/api/v1/assets?format=json&owner=" + account + "&cursor=" + cursor.String()
-		req, err := http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
-			return "", err
-		}
-		res, err := httpClient.Do(req)
-		if err != nil {
-			return "", err
-		}
-		defer res.Body.Close()
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			return "", err
-		}
-		assets = append(assets, gjson.Get(string(body), "assets").Array()...)
+// Used in immediate response
+func GetOpenSeaUserAssets(logger *golog.Logger, account string, cursor string) (string, error) {
+	// build request
+	httpClient := &http.Client{}
+	url := "https://api.opensea.io/api/v1/assets?format=json&owner=" + account
+	if cursor != "" {
+		url += "&cursor=" + cursor
 	}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("X-API-KEY", config.Load().OpenSea.ApiKey)
 
-	// serialize
-	data := "["
-	for i := 0; i < len(assets); i++ {
-		data += assets[i].String()
+	// send request
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
 	}
-	return data + "]", nil
+	defer res.Body.Close()
+
+	// analysis response
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }

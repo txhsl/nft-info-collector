@@ -6,7 +6,6 @@ import (
 	"nft-info-collector/config"
 
 	"github.com/kataras/golog"
-	"github.com/tidwall/gjson"
 )
 
 // Used in DB cache and immediate response
@@ -32,5 +31,5 @@ func GetNFTScanTrends(logger *golog.Logger) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return gjson.Get(string(body), "data").String(), nil
+	return string(body), nil
 }

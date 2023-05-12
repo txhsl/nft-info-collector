@@ -5,6 +5,7 @@ import (
 
 	"github.com/kataras/golog"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -96,4 +97,30 @@ func GetOffersLastUpdated(ctx context.Context, coll *mongo.Collection, slug stri
 		return 0, err
 	}
 	return collection["last_updated"].(int64), nil
+}
+
+func GetCollectionContract(ctx context.Context, slug string) (string, error) {
+	// connect db
+	client, err := Connect()
+	if err != nil {
+		return "", err
+	}
+	defer client.Disconnect(context.Background())
+	coll := client.Database("nft-info-collector").Collection("collection-index")
+
+	// get collections
+	filter := bson.M{
+		"opensea_slug":  slug,
+		"contract_type": "ERC721",
+	}
+	option := options.FindOne()
+	result := coll.FindOne(ctx, filter, option)
+	if result.Err() != nil {
+		return "", result.Err()
+	}
+	var collection bson.M
+	if err := result.Decode(&collection); err != nil {
+		return "", err
+	}
+	return []interface{}(collection["contracts"].(primitive.A))[0].(string), nil
 }

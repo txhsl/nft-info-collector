@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kataras/iris/v12"
+	"github.com/tidwall/gjson"
 )
 
 func TestGetNFTGoCollections(t *testing.T) {
@@ -18,7 +19,7 @@ func TestGetNFTGoCollections(t *testing.T) {
 	}
 
 	var collections []interface{}
-	err = json.Unmarshal([]byte(data), &collections)
+	err = json.Unmarshal([]byte(gjson.Get(data, "collections").String()), &collections)
 	if err != nil {
 		t.Error(err)
 	}
@@ -61,7 +62,7 @@ func TestGetNFTGoCollectionNFTs(t *testing.T) {
 	}
 
 	var nfts []interface{}
-	err = json.Unmarshal([]byte(data), &nfts)
+	err = json.Unmarshal([]byte(gjson.Get(data, "nfts").String()), &nfts)
 	if err != nil {
 		t.Error(err)
 	}
@@ -90,6 +91,20 @@ func TestGetNFTGoNFTMetrics(t *testing.T) {
 
 	var metrics map[string]interface{}
 	err = json.Unmarshal([]byte(data), &metrics)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetNFTGoUserAssets(t *testing.T) {
+	logger := iris.New().Logger()
+	data, err := http.GetNFTGoUserAssets(logger, "0x480dd671880768D24317FA965D00f43D25868892", 0, 10)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var assets []interface{}
+	err = json.Unmarshal([]byte(gjson.Get(data, "assets").String()), &assets)
 	if err != nil {
 		t.Error(err)
 	}

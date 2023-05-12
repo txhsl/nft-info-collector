@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kataras/iris/v12"
+	"github.com/tidwall/gjson"
 )
 
 func TestGetNFTScanTrends(t *testing.T) {
@@ -16,7 +17,7 @@ func TestGetNFTScanTrends(t *testing.T) {
 	}
 
 	var collections []interface{}
-	err = json.Unmarshal([]byte(data), &collections)
+	err = json.Unmarshal([]byte(gjson.Get(data, "data").String()), &collections)
 	if err != nil {
 		t.Error(err)
 	}

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math"
 	"nft-info-collector/config"
 	"nft-info-collector/db"
@@ -12,341 +11,8 @@ import (
 	"time"
 
 	"github.com/kataras/iris/v12"
+	"github.com/tidwall/gjson"
 )
-
-// DB related, write
-func UpdateCachedCollectionIndex(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-	conf := config.Load().NFTGo
-
-	// connect db
-	dbClient, err := db.Connect()
-	if err != nil {
-		logger.Error("[DB] Failed to connect mongodb")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	defer dbClient.Disconnect(context.TODO())
-	coll := dbClient.Database("nft-info-collector").Collection("collection-index")
-
-	for i := 0; i < conf.Limit; i += conf.PageSize {
-		// fetch data
-		data, err := http.GetNFTGoCollections(logger, "all", i, conf.PageSize)
-		if err != nil {
-			logger.Error("[HTTP] Failed to fetch collections")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		// deserialize result
-		var collections []interface{}
-		err = json.Unmarshal([]byte(data), &collections)
-		if err != nil {
-			logger.Error("[API] Failed to serialize collections")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		// cache result
-		err = db.UpdateCollectionIndex(context.TODO(), logger, coll, collections)
-		if err != nil {
-			logger.Error("[DB] Failed to update cached collections")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		logger.Info("[DB] Index updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
-	}
-}
-
-// DB related, write and read
-func UpdateCachedCollectionMetrics(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-	conf := config.Load().Reservoir
-
-	// connect db
-	dbClient, err := db.Connect()
-	if err != nil {
-		logger.Error("[DB] Failed to connect mongodb")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	defer dbClient.Disconnect(context.TODO())
-
-	// fetch details
-	coll := dbClient.Database("nft-info-collector").Collection("collection-metrics")
-
-	for i := 0; i < conf.Limit; i += conf.PageSize {
-		// read db
-		result, err := db.GetSortedCollectionIndex(context.TODO(), logger, "volume_usd", false, i, conf.PageSize)
-		if err != nil {
-			logger.Error("[DB] Failed to read cached collections")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-		data, err := json.Marshal(result)
-		if err != nil {
-			logger.Error("[API] Failed to deserialize cached collections")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-		var batch []map[string]interface{}
-		err = json.Unmarshal([]byte(data), &batch)
-		if err != nil {
-			logger.Error("[API] Failed to get collection contracts")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		contracts := make([]string, 0, len(batch))
-		for _, collection := range batch {
-			contract := collection["contracts"].([]interface{})[0].(string)
-			contracts = append(contracts, contract)
-		}
-		collections, err := http.GetReservoirCollections(logger, contracts)
-		if err != nil {
-			logger.Error("[HTTP] Failed to fetch collection info")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		// deserialize result
-		var metrics []interface{}
-		err = json.Unmarshal([]byte(collections), &metrics)
-		if err != nil {
-			logger.Error("[API] Failed to serialize collections")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		// cache result
-		err = db.UpdateCollectionMetrics(context.TODO(), logger, coll, metrics)
-		if err != nil {
-			logger.Error("[DB] Failed to update cached collection details")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		logger.Info("[DB] Metrics updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
-	}
-}
-
-// DB related, write and read
-func UpdateCachedCollectionDetails(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-	conf := config.Load().OpenSea
-
-	// connect db
-	dbClient, err := db.Connect()
-	if err != nil {
-		logger.Error("[DB] Failed to connect mongodb")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	defer dbClient.Disconnect(context.TODO())
-
-	// fetch details
-	detailColl := dbClient.Database("nft-info-collector").Collection("collection-details")
-	offerColl := dbClient.Database("nft-info-collector").Collection("collection-offers")
-
-	for i := 0; i < conf.Limit; i += conf.PageSize {
-		// read db
-		result, err := db.GetSortedCollectionIndex(context.TODO(), logger, "volume_usd", false, i, conf.PageSize)
-		if err != nil {
-			logger.Error("[DB] Failed to read cached collections")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-		data, err := json.Marshal(result)
-		if err != nil {
-			logger.Error("[API] Failed to deserialize cached collections")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-		var collections []map[string]interface{}
-		err = json.Unmarshal([]byte(data), &collections)
-		if err != nil {
-			logger.Error("[API] Failed to get collection slugs")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		detailBatch := []map[string]interface{}{}
-		offerBatch := []map[string]interface{}{}
-		for _, collection := range collections {
-			// fetch detail
-			slug := collection["opensea_slug"].(string)
-			data, err := http.GetOpenSeaCollectionInfo(logger, slug)
-			if err != nil {
-				logger.Error("[HTTP] Failed to fetch collection info")
-				ctx.StopWithStatus(iris.StatusInternalServerError)
-				return
-			}
-
-			// deserialize result
-			var info map[string]interface{}
-			err = json.Unmarshal([]byte(data), &info)
-			if err != nil {
-				// skip if not found
-				continue
-			}
-
-			// read last update time
-			lastUpdated, _ := db.GetOffersLastUpdated(context.TODO(), offerColl, slug)
-			oneDaySales := info["stats"].(map[string]interface{})["one_day_sales"].(float64)
-			if oneDaySales == 0 && lastUpdated >= time.Now().Add(-24*time.Hour).Unix() {
-				// skip if no sales in 24 hours
-				continue
-			}
-
-			// type format
-			info["dev_seller_fee_basis_points"], err = strconv.Atoi(info["dev_seller_fee_basis_points"].(string))
-			if err != nil {
-				logger.Error("[HTTP] Failed to format dev_seller_fee_basis_points")
-				ctx.StopWithStatus(iris.StatusInternalServerError)
-				return
-			}
-			info["dev_buyer_fee_basis_points"], err = strconv.Atoi(info["dev_buyer_fee_basis_points"].(string))
-			if err != nil {
-				logger.Error("[HTTP] Failed to format dev_buyer_fee_basis_points")
-				ctx.StopWithStatus(iris.StatusInternalServerError)
-				return
-			}
-			info["opensea_seller_fee_basis_points"] = int(info["opensea_seller_fee_basis_points"].(float64))
-			info["opensea_buyer_fee_basis_points"], err = strconv.Atoi(info["opensea_buyer_fee_basis_points"].(string))
-			if err != nil {
-				logger.Error("[HTTP] Failed to format opensea_buyer_fee_basis_points")
-				ctx.StopWithStatus(iris.StatusInternalServerError)
-				return
-			}
-			createdDate, err := time.Parse(time.RFC3339, info["created_date"].(string))
-			if err != nil {
-				logger.Error("[HTTP] Failed to format created_date")
-				ctx.StopWithStatus(iris.StatusInternalServerError)
-				return
-			}
-			info["created_date"] = createdDate.Unix()
-
-			// add total royalty
-			if info["is_creator_fees_enforced"].(bool) {
-				info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int) + info["dev_seller_fee_basis_points"].(int)
-			} else {
-				info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int)
-			}
-			// add last updated time
-			info["last_updated"] = time.Now().Unix()
-			detailBatch = append(detailBatch, info)
-
-			// fetch collection offers if enabled
-			if info["is_collection_offers_enabled"].(bool) {
-				data, err := http.GetOpenSeaCollectionOffers(logger, slug)
-				if err != nil {
-					logger.Error("[HTTP] Failed to fetch collection offers")
-					ctx.StopWithStatus(iris.StatusInternalServerError)
-					return
-				}
-
-				// deserialize result
-				var offers []interface{}
-				err = json.Unmarshal([]byte(data), &offers)
-				if err != nil {
-					// skip if not found
-					continue
-				}
-
-				// build doc
-				doc := map[string]interface{}{}
-				doc["slug"] = slug
-				if len(offers) > 5 {
-					doc["offers"] = offers[0:5]
-				} else {
-					doc["offers"] = offers
-				}
-				doc["last_updated"] = time.Now().Unix()
-				offerBatch = append(offerBatch, doc)
-			}
-		}
-
-		// cache result
-		err = db.UpdateCollectionDetails(context.TODO(), logger, detailColl, detailBatch)
-		if err != nil {
-			logger.Error("[DB] Failed to update cached collection details")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-		err = db.UpdateCollectionOffers(context.TODO(), logger, offerColl, offerBatch)
-		if err != nil {
-			logger.Error("[DB] Failed to update cached collection offers")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-
-		logger.Info("[DB] Details updated: " + fmt.Sprint(i+conf.PageSize) + " / " + fmt.Sprint(conf.Limit))
-	}
-}
-
-// TODO: update and read from db
-func GetCollectionDetail(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-
-	// parse params
-	slug := ctx.Params().GetString("slug")
-	if slug == "" {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-
-	// fetch data
-	data, err := http.GetOpenSeaCollectionInfo(logger, slug)
-	if err != nil {
-		logger.Error("[HTTP] Failed to fetch collection info")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	ctx.WriteString(data)
-}
-
-// TODO: update and read from db
-func GetCollectionInfo(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-
-	// parse params
-	contract := ctx.Params().GetString("contract")
-	if contract == "" {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-
-	// fetch data
-	data, err := http.GetNFTGoCollectionInfo(logger, contract)
-	if err != nil {
-		logger.Error("[HTTP] Failed to fetch collection metrics")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	ctx.WriteString(data)
-}
-
-// TODO: update and read from db
-func GetCollectionMetrics(ctx iris.Context) {
-	logger := ctx.Application().Logger()
-
-	// parse params
-	contract := ctx.Params().GetString("contract")
-	if contract == "" {
-		ctx.StopWithStatus(iris.StatusBadRequest)
-		return
-	}
-
-	// fetch data
-	data, err := http.GetNFTGoCollectionMetrics(logger, contract)
-	if err != nil {
-		logger.Error("[HTTP] Failed to fetch collection metrics")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	ctx.WriteString(data)
-}
 
 func SearchCollections(ctx iris.Context) {
 	logger := ctx.Application().Logger()
@@ -399,6 +65,10 @@ func SearchCollections(ctx iris.Context) {
 	// pagination params
 	offset := ctx.URLParamIntDefault("offset", 0)
 	limit := ctx.URLParamIntDefault("limit", 20)
+	if limit > 50 {
+		ctx.StopWithStatus(iris.StatusBadRequest)
+		return
+	}
 
 	// search
 	collections, err := db.SearchCollections(
@@ -430,5 +100,186 @@ func SearchCollections(ctx iris.Context) {
 		return
 	}
 
-	ctx.JSON(collections)
+	ctx.JSON(map[string]interface{}{"collections": collections})
+}
+
+func GetCollectionDetail(ctx iris.Context) {
+	logger := ctx.Application().Logger()
+
+	// parse params
+	slug := ctx.Params().GetString("slug")
+	if slug == "" {
+		ctx.StopWithStatus(iris.StatusBadRequest)
+		return
+	}
+
+	// read index
+	contract, _ := db.GetCollectionContract(context.TODO(), slug)
+	if contract == "" {
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+
+	// fetch info
+	infoData, err := http.GetOpenSeaCollectionInfo(logger, slug)
+	if err != nil {
+		logger.Error("[HTTP] Failed to fetch collection detail")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	var info map[string]interface{}
+	err = json.Unmarshal([]byte(gjson.Get(infoData, "collection").String()), &info)
+	if err != nil {
+		logger.Error("[API] Failed to deserialize collection detail")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+	}
+	// fetch collection offers
+	offerData, err := http.GetOpenSeaCollectionOffers(logger, slug)
+	if err != nil {
+		logger.Error("[HTTP] Failed to fetch collection offers")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	var offers []interface{}
+	err = json.Unmarshal([]byte(gjson.Get(offerData, "offers").String()), &offers)
+	if err != nil {
+		logger.Error("[API] Failed to deserialize collection offers")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+	}
+	// fetch listings
+	listingData, err := http.GetReservoirCollectionListing(logger, contract)
+	if err != nil {
+		logger.Error("[HTTP] Failed to fetch collection listings")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	// fetch recent sales
+	salesData, err := http.GetOpenSeaCollectionRecentSales(logger, slug)
+	if err != nil {
+		logger.Error("[HTTP] Failed to fetch collection sales")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	// fetch collection graph
+	graphData, err := http.GetReservoirCollectionDaily(logger, contract)
+	if err != nil {
+		logger.Error("[HTTP] Failed to fetch collection graph")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	var graph []interface{}
+	err = json.Unmarshal([]byte(gjson.Get(graphData, "collections").String()), &graph)
+	if err != nil {
+		logger.Error("[API] Failed to deserialize collection graph")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+	}
+
+	// update db
+	// detail
+	info["dev_seller_fee_basis_points"], err = strconv.Atoi(info["dev_seller_fee_basis_points"].(string))
+	if err != nil {
+		logger.Error("[HTTP] Failed to format dev_seller_fee_basis_points")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	info["dev_buyer_fee_basis_points"], err = strconv.Atoi(info["dev_buyer_fee_basis_points"].(string))
+	if err != nil {
+		logger.Error("[HTTP] Failed to format dev_buyer_fee_basis_points")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	info["opensea_seller_fee_basis_points"] = int(info["opensea_seller_fee_basis_points"].(float64))
+	info["opensea_buyer_fee_basis_points"], err = strconv.Atoi(info["opensea_buyer_fee_basis_points"].(string))
+	if err != nil {
+		logger.Error("[HTTP] Failed to format opensea_buyer_fee_basis_points")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	createdDate, err := time.Parse(time.RFC3339, info["created_date"].(string))
+	if err != nil {
+		logger.Error("[HTTP] Failed to format created_date")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	info["created_date"] = createdDate.Unix()
+	if info["is_creator_fees_enforced"].(bool) {
+		info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int) + info["dev_seller_fee_basis_points"].(int)
+	} else {
+		info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int)
+	}
+	info["last_updated"] = time.Now().Unix()
+	err = db.UpdateCollectionDetail(context.TODO(), logger, info)
+	if err != nil {
+		logger.Error("[DB] Failed to update collection detail")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	// offers
+	doc := map[string]interface{}{}
+	doc["slug"] = slug
+	if len(offers) > 5 {
+		doc["offers"] = offers[:5]
+	} else {
+		doc["offers"] = offers
+	}
+	doc["last_updated"] = time.Now().Unix()
+	err = db.UpdateCollectionOffer(context.TODO(), logger, doc)
+	if err != nil {
+		logger.Error("[DB] Failed to update collection offer")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+
+	// format data
+	infoRes := map[string]interface{}{}
+	offersRes := []map[string]interface{}{}
+	listingsRes := []map[string]interface{}{}
+	salesRes := []map[string]interface{}{}
+
+	for i, offer := range gjson.Get(offerData, "offers").Array() {
+		offersRes = append(offersRes, map[string]interface{}{
+			"price": gjson.Get(offer.String(), "protocol_data.parameters.offer.0.endAmount").Float() / 1000000000000000000,
+		})
+		if i >= 4 {
+			break
+		}
+	}
+	for i, listing := range gjson.Get(listingData, "orders").Array() {
+		listingsRes = append(listingsRes, map[string]interface{}{
+			"price": gjson.Get(listing.String(), "price.amount.decimal").Float(),
+		})
+		if i >= 4 {
+			break
+		}
+	}
+	count := 0
+	for _, sale := range gjson.Get(salesData, "asset_events").Array() {
+		token := gjson.Get(sale.String(), "payment_token.address").String()
+		if token == "0x0000000000000000000000000000000000000000" {
+			salesRes = append(salesRes, map[string]interface{}{
+				"price": gjson.Get(sale.String(), "total_price").Float(),
+				"date":  gjson.Get(sale.String(), "created_date").String(),
+			})
+			count++
+		}
+		if count >= 5 {
+			break
+		}
+	}
+
+	// merge results
+	infoRes["name"] = info["name"]
+	infoRes["image_url"] = info["image_url"]
+	infoRes["total_supply"] = info["stats"].(map[string]interface{})["total_supply"]
+	infoRes["one_day_sales"] = info["stats"].(map[string]interface{})["one_day_sales"]
+	infoRes["floor_price"] = info["stats"].(map[string]interface{})["floor_price"]
+	infoRes["total_royalty"] = info["total_royalty"]
+	infoRes["top_bid_price"] = offersRes[0]["price"]
+
+	infoRes["listings"] = listingsRes
+	infoRes["offers"] = offersRes
+	infoRes["sales"] = salesRes
+	infoRes["graph"] = graph
+
+	ctx.JSON(infoRes)
 }

@@ -7,7 +7,6 @@ import (
 	"nft-info-collector/config"
 
 	"github.com/kataras/golog"
-	"github.com/tidwall/gjson"
 )
 
 // Only used in DB cache
@@ -33,7 +32,7 @@ func GetNFTGoCollections(logger *golog.Logger, timeRange string, offset int, lim
 	if err != nil {
 		return "", err
 	}
-	return gjson.Get(string(body), "collections").String(), nil
+	return string(body), nil
 }
 
 // @deprecated
@@ -112,7 +111,7 @@ func GetNFTGoCollectionNFTs(logger *golog.Logger, contract string, offset int, l
 	if err != nil {
 		return "", err
 	}
-	return gjson.Get(string(body), "nfts").String(), nil
+	return string(body), nil
 }
 
 // Used in immediate response
@@ -190,5 +189,5 @@ func GetNFTGoUserAssets(logger *golog.Logger, account string, offset int, limit 
 	if err != nil {
 		return "", err
 	}
-	return gjson.Get(string(body), "assets").String(), nil
+	return string(body), nil
 }
