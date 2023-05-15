@@ -236,29 +236,47 @@ func GetCollectionDetail(ctx iris.Context) {
 	listingsRes := []map[string]interface{}{}
 	salesRes := []map[string]interface{}{}
 
-	for i, offer := range gjson.Get(offerData, "offers").Array() {
-		offersRes = append(offersRes, map[string]interface{}{
-			"price": gjson.Get(offer.String(), "protocol_data.parameters.offer.0.endAmount").Float() / 1000000000000000000,
-		})
-		if i >= 4 {
-			break
-		}
-	}
-	for i, listing := range gjson.Get(listingData, "orders").Array() {
-		listingsRes = append(listingsRes, map[string]interface{}{
-			"price": gjson.Get(listing.String(), "price.amount.decimal").Float(),
-		})
-		if i >= 4 {
-			break
-		}
-	}
 	count := 0
+	for _, offer := range gjson.Get(offerData, "offers").Array() {
+		chain := gjson.Get(offer.String(), "chain").String()
+		token := gjson.Get(offer.String(), "protocol_data.parameters.offer.0.token").String()
+		if chain == "ethereum" && token == "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" {
+			offersRes = append(offersRes, map[string]interface{}{
+				"price":      gjson.Get(offer.String(), "protocol_data.parameters.offer.0.endAmount").Float() / 1000000000000000000,
+				"start_time": gjson.Get(offer.String(), "protocol_data.parameters.startTime").Int(),
+				"end_time":   gjson.Get(offer.String(), "protocol_data.parameters.endTime").Int(),
+			})
+			count++
+		}
+		if count >= 5 {
+			break
+		}
+	}
+	count = 0
+	for _, listing := range gjson.Get(listingData, "orders").Array() {
+		token := gjson.Get(listing.String(), "price.currency.symbol").String()
+		if token == "ETH" {
+			listingsRes = append(listingsRes, map[string]interface{}{
+				"token_id":    gjson.Get(listing.String(), "criteria.data.token.tokenId").String(),
+				"price":       gjson.Get(listing.String(), "price.amount.decimal").Float(),
+				"valid_from":  gjson.Get(listing.String(), "validFrom").Int(),
+				"valid_until": gjson.Get(listing.String(), "validUntil").Int(),
+			})
+			count++
+		}
+		if count >= 5 {
+			break
+		}
+	}
+	count = 0
 	for _, sale := range gjson.Get(salesData, "asset_events").Array() {
 		token := gjson.Get(sale.String(), "payment_token.address").String()
 		if token == "0x0000000000000000000000000000000000000000" {
 			salesRes = append(salesRes, map[string]interface{}{
-				"price": gjson.Get(sale.String(), "total_price").Float(),
-				"date":  gjson.Get(sale.String(), "created_date").String(),
+				"token_id":  gjson.Get(sale.String(), "asset.token_id").String(),
+				"image_url": gjson.Get(sale.String(), "asset.image_preview_url").String(),
+				"price":     gjson.Get(sale.String(), "total_price").Float(),
+				"date":      gjson.Get(sale.String(), "created_date").String(),
 			})
 			count++
 		}
@@ -272,9 +290,14 @@ func GetCollectionDetail(ctx iris.Context) {
 	infoRes["image_url"] = info["image_url"]
 	infoRes["total_supply"] = info["stats"].(map[string]interface{})["total_supply"]
 	infoRes["one_day_sales"] = info["stats"].(map[string]interface{})["one_day_sales"]
+	infoRes["one_day_sales_change"] = info["stats"].(map[string]interface{})["one_day_sales_change"]
 	infoRes["floor_price"] = info["stats"].(map[string]interface{})["floor_price"]
 	infoRes["total_royalty"] = info["total_royalty"]
-	infoRes["top_bid_price"] = offersRes[0]["price"]
+	if len(offersRes) > 0 {
+		infoRes["top_bid_price"] = offersRes[0]["price"]
+	} else {
+		infoRes["top_bid_price"] = nil
+	}
 
 	infoRes["listings"] = listingsRes
 	infoRes["offers"] = offersRes
