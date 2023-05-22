@@ -33,10 +33,8 @@ type mongodb struct {
 }
 
 type keywords struct {
-	Ranges  []string `yaml:"ranges"`
-	Filters []string `yaml:"filters"`
-	Sorts   []string `yaml:"sorts"`
-	Times   []string `yaml:"times"`
+	Sorts []string `yaml:"sorts"`
+	Times []string `yaml:"times"`
 }
 
 type Config struct {

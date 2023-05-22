@@ -79,53 +79,6 @@ func SearchCollections(
 		},
 	})
 
-	// join metrics
-	pipeline = append(pipeline, bson.M{
-		"$lookup": bson.M{
-			"from":         "collection-offers",
-			"localField":   "slug",
-			"foreignField": "slug",
-			"as":           "collection_offers",
-		},
-	})
-	pipeline = append(pipeline, bson.M{
-		"$replaceRoot": bson.M{
-			"newRoot": bson.M{
-				"$mergeObjects": bson.A{"$$ROOT", bson.M{"$arrayElemAt": bson.A{"$collection_offers", 0}}},
-			},
-		},
-	})
-	pipeline = append(pipeline, bson.M{
-		"$project": bson.M{
-			"collection_offers": 0,
-		},
-	})
-
-	// pop top bid
-	pipeline = append(pipeline, bson.M{
-		"$addFields": bson.M{
-			"top_offer": bson.M{
-				"$first": "$offers",
-			},
-		},
-	})
-	pipeline = append(pipeline, bson.M{
-		"$addFields": bson.M{
-			"top_bid": bson.M{
-				"$first": "$top_offer.protocol_data.parameters.offer",
-			},
-		},
-	})
-	pipeline = append(pipeline, bson.M{
-		"$addFields": bson.M{
-			"top_bid_price": bson.M{
-				"$divide": bson.A{bson.M{
-					"$toDecimal": "$top_bid.endAmount",
-				}, 1000000000000000000},
-			},
-		},
-	})
-
 	// add fields
 	pipeline = append(pipeline, bson.M{
 		"$addFields": bson.M{
@@ -177,6 +130,8 @@ func SearchCollections(
 	pipeline = append(pipeline, bson.M{
 		"$limit": limit,
 	})
+
+	// project
 	pipeline = append(pipeline, bson.M{
 		"$replaceRoot": bson.M{
 			"newRoot": bson.M{
@@ -184,7 +139,6 @@ func SearchCollections(
 			},
 		},
 	})
-	// project
 	pipeline = append(pipeline, bson.M{
 		"$project": bson.M{
 			"_id":                  0,

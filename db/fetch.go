@@ -71,21 +71,7 @@ func GetSortedCollectionIndex(ctx context.Context, logger *golog.Logger, keyword
 	return results, nil
 }
 
-func GetCollectionLastUpdated(ctx context.Context, coll *mongo.Collection, slug string) (int64, error) {
-	filter := bson.M{"slug": slug}
-	option := options.FindOne().SetProjection(bson.M{"last_updated": 1})
-	result := coll.FindOne(ctx, filter, option)
-	if result.Err() != nil {
-		return 0, result.Err()
-	}
-	var collection bson.M
-	if err := result.Decode(&collection); err != nil {
-		return 0, err
-	}
-	return collection["last_updated"].(int64), nil
-}
-
-func GetOffersLastUpdated(ctx context.Context, coll *mongo.Collection, slug string) (int64, error) {
+func GetDetailLastUpdated(ctx context.Context, coll *mongo.Collection, slug string) (int64, error) {
 	filter := bson.M{"slug": slug}
 	option := options.FindOne().SetProjection(bson.M{"last_updated": 1})
 	result := coll.FindOne(ctx, filter, option)

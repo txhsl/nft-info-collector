@@ -148,8 +148,7 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 	defer dbClient.Disconnect(context.TODO())
 
 	// fetch details
-	detailColl := dbClient.Database("nft-info-collector").Collection("collection-details")
-	offerColl := dbClient.Database("nft-info-collector").Collection("collection-offers")
+	coll := dbClient.Database("nft-info-collector").Collection("collection-details")
 
 	for i := 0; i < conf.Limit; i += conf.PageSize {
 		// read db
@@ -174,7 +173,6 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 		}
 
 		detailBatch := []map[string]interface{}{}
-		offerBatch := []map[string]interface{}{}
 		for _, collection := range collections {
 			// fetch detail
 			slug := collection["opensea_slug"].(string)
@@ -194,7 +192,7 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 			}
 
 			// read last update time
-			lastUpdated, _ := db.GetOffersLastUpdated(context.TODO(), offerColl, slug)
+			lastUpdated, _ := db.GetDetailLastUpdated(context.TODO(), coll, slug)
 			oneDaySales := info["stats"].(map[string]interface{})["one_day_sales"].(float64)
 			if oneDaySales == 0 && lastUpdated >= time.Now().Add(-24*time.Hour).Unix() {
 				// skip if no sales in 24 hours
@@ -235,11 +233,9 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 			} else {
 				info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int)
 			}
-			// add last updated time
-			info["last_updated"] = time.Now().Unix()
-			detailBatch = append(detailBatch, info)
 
 			// fetch collection offers if enabled
+			info["top_bid_price"] = nil
 			if info["is_collection_offers_enabled"].(bool) {
 				data, err := http.GetOpenSeaCollectionOffers(logger, slug)
 				if err != nil {
@@ -248,37 +244,26 @@ func UpdateCachedCollectionDetails(ctx iris.Context) {
 					return
 				}
 
-				// deserialize result
-				var offers []interface{}
-				err = json.Unmarshal([]byte(gjson.Get(data, "offers").String()), &offers)
-				if err != nil {
-					// skip if not found
-					continue
+				// find top bid
+				for _, offer := range gjson.Get(data, "offers").Array() {
+					chain := gjson.Get(offer.String(), "chain").String()
+					token := gjson.Get(offer.String(), "protocol_data.parameters.offer.0.token").String()
+					if chain == "ethereum" && token == "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" {
+						info["top_bid_price"] = gjson.Get(offer.String(), "protocol_data.parameters.offer.0.endAmount").Float() / 1000000000000000000
+					}
+					break
 				}
-
-				// build doc
-				doc := map[string]interface{}{}
-				doc["slug"] = slug
-				if len(offers) > 5 {
-					doc["offers"] = offers[:5]
-				} else {
-					doc["offers"] = offers
-				}
-				doc["last_updated"] = time.Now().Unix()
-				offerBatch = append(offerBatch, doc)
 			}
+
+			// add last updated time
+			info["last_updated"] = time.Now().Unix()
+			detailBatch = append(detailBatch, info)
 		}
 
 		// cache result
-		err = db.UpdateCollectionDetails(context.TODO(), logger, detailColl, detailBatch)
+		err = db.UpdateCollectionDetails(context.TODO(), logger, coll, detailBatch)
 		if err != nil {
 			logger.Error("[DB] Failed to update cached collection details")
-			ctx.StopWithStatus(iris.StatusInternalServerError)
-			return
-		}
-		err = db.UpdateCollectionOffers(context.TODO(), logger, offerColl, offerBatch)
-		if err != nil {
-			logger.Error("[DB] Failed to update cached collection offers")
 			ctx.StopWithStatus(iris.StatusInternalServerError)
 			return
 		}

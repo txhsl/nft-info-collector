@@ -203,62 +203,6 @@ func GetCollectionDetail(ctx iris.Context) {
 		ctx.StopWithStatus(iris.StatusInternalServerError)
 	}
 
-	// update db
-	// detail
-	info["dev_seller_fee_basis_points"], err = strconv.Atoi(info["dev_seller_fee_basis_points"].(string))
-	if err != nil {
-		logger.Error("[HTTP] Failed to format dev_seller_fee_basis_points")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	info["dev_buyer_fee_basis_points"], err = strconv.Atoi(info["dev_buyer_fee_basis_points"].(string))
-	if err != nil {
-		logger.Error("[HTTP] Failed to format dev_buyer_fee_basis_points")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	info["opensea_seller_fee_basis_points"] = int(info["opensea_seller_fee_basis_points"].(float64))
-	info["opensea_buyer_fee_basis_points"], err = strconv.Atoi(info["opensea_buyer_fee_basis_points"].(string))
-	if err != nil {
-		logger.Error("[HTTP] Failed to format opensea_buyer_fee_basis_points")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	createdDate, err := time.Parse(time.RFC3339, info["created_date"].(string))
-	if err != nil {
-		logger.Error("[HTTP] Failed to format created_date")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	info["created_date"] = createdDate.Unix()
-	if info["is_creator_fees_enforced"].(bool) {
-		info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int) + info["dev_seller_fee_basis_points"].(int)
-	} else {
-		info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int)
-	}
-	info["last_updated"] = time.Now().Unix()
-	err = db.UpdateCollectionDetail(context.TODO(), logger, info)
-	if err != nil {
-		logger.Error("[DB] Failed to update collection detail")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-	// offers
-	doc := map[string]interface{}{}
-	doc["slug"] = slug
-	if len(offers) > 5 {
-		doc["offers"] = offers[:5]
-	} else {
-		doc["offers"] = offers
-	}
-	doc["last_updated"] = time.Now().Unix()
-	err = db.UpdateCollectionOffer(context.TODO(), logger, doc)
-	if err != nil {
-		logger.Error("[DB] Failed to update collection offer")
-		ctx.StopWithStatus(iris.StatusInternalServerError)
-		return
-	}
-
 	// format data
 	infoRes := map[string]interface{}{}
 	offersRes := []map[string]interface{}{}
@@ -314,6 +258,49 @@ func GetCollectionDetail(ctx iris.Context) {
 		}
 	}
 
+	// update db
+	info["dev_seller_fee_basis_points"], err = strconv.Atoi(info["dev_seller_fee_basis_points"].(string))
+	if err != nil {
+		logger.Error("[HTTP] Failed to format dev_seller_fee_basis_points")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	info["dev_buyer_fee_basis_points"], err = strconv.Atoi(info["dev_buyer_fee_basis_points"].(string))
+	if err != nil {
+		logger.Error("[HTTP] Failed to format dev_buyer_fee_basis_points")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	info["opensea_seller_fee_basis_points"] = int(info["opensea_seller_fee_basis_points"].(float64))
+	info["opensea_buyer_fee_basis_points"], err = strconv.Atoi(info["opensea_buyer_fee_basis_points"].(string))
+	if err != nil {
+		logger.Error("[HTTP] Failed to format opensea_buyer_fee_basis_points")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	createdDate, err := time.Parse(time.RFC3339, info["created_date"].(string))
+	if err != nil {
+		logger.Error("[HTTP] Failed to format created_date")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	info["created_date"] = createdDate.Unix()
+	if info["is_creator_fees_enforced"].(bool) {
+		info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int) + info["dev_seller_fee_basis_points"].(int)
+	} else {
+		info["total_royalty"] = info["opensea_seller_fee_basis_points"].(int)
+	}
+	if len(offersRes) > 0 {
+		info["top_bid_price"] = offersRes[0]["price"]
+	}
+	info["last_updated"] = time.Now().Unix()
+	err = db.UpdateCollectionDetail(context.TODO(), logger, info)
+	if err != nil {
+		logger.Error("[DB] Failed to update collection detail")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+
 	// merge results
 	infoRes["name"] = info["name"]
 	infoRes["image_url"] = info["image_url"]
@@ -322,15 +309,11 @@ func GetCollectionDetail(ctx iris.Context) {
 	infoRes["one_day_sales_change"] = info["stats"].(map[string]interface{})["one_day_sales_change"]
 	infoRes["floor_price"] = info["stats"].(map[string]interface{})["floor_price"]
 	infoRes["total_royalty"] = info["total_royalty"]
-	if len(offersRes) > 0 {
-		infoRes["top_bid_price"] = offersRes[0]["price"]
-	} else {
-		infoRes["top_bid_price"] = nil
-	}
+	infoRes["top_bid_price"] = info["top_bid_price"]
 
 	infoRes["listings"] = listingsRes
-	infoRes["offers"] = offersRes
-	infoRes["sales"] = salesRes
+	infoRes["collection_offers"] = offersRes
+	infoRes["recent_sales"] = salesRes
 	infoRes["graph"] = graph
 
 	ctx.JSON(infoRes)

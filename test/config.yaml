@@ -21,24 +21,13 @@ mongodb:
 port: ":8080"
 
 keywords:
-  ranges:
-    - "floor_price"
-    - "sales_count"
-    - "royalty"
-    - "profit_margin"
-    - "owners_percentage"
-    - "collection_age"
-  filters:
-    - "name"
-    - "contract_type"
-    - "categories"
-    - "has_rarity"
   sorts:
     - "floor_price"
     - "market_cap"
     - "total_volume"
     - "total_sales"
     - "num_owners"
+    - "profit_margin"
   times:
     - "1d"
     - "7d"
