@@ -11,16 +11,16 @@ func SearchCollections(
 	ctx context.Context,
 	logger *golog.Logger,
 	timeRange string,
-	floorPriceMin int,
-	floorPriceMax int,
+	floorPriceMin float32,
+	floorPriceMax float32,
 	saleCountMin int,
 	saleCountMax int,
 	royaltyMin int,
 	royaltyMax int,
-	profitMarginMin int,
-	profitMarginMax int,
-	ownerPercentageMin int,
-	ownerPercentageMax int,
+	profitMarginMin float32,
+	profitMarginMax float32,
+	ownerPercentageMin float32,
+	ownerPercentageMax float32,
 	collectionAgeMin int,
 	collectionAgemax int,
 	flt string,
@@ -129,7 +129,7 @@ func SearchCollections(
 	// add fields
 	pipeline = append(pipeline, bson.M{
 		"$addFields": bson.M{
-			"owners_percentage": bson.M{
+			"owner_percentage": bson.M{
 				"$multiply": bson.A{100, bson.M{
 					"$divide": bson.A{"$stats.num_owners", "$stats.total_supply"},
 				}},
@@ -152,7 +152,7 @@ func SearchCollections(
 	// owner percentage, profit margin
 	pipeline = append(pipeline, bson.M{
 		"$match": bson.M{
-			"owners_percentage": bson.M{
+			"owner_percentage": bson.M{
 				"$gte": ownerPercentageMin,
 				"$lte": ownerPercentageMax,
 			},
@@ -197,7 +197,7 @@ func SearchCollections(
 			"total_volume":         1,
 			"one_day_sales":        1,
 			"one_day_sales_change": 1,
-			"owners_percentage":    1,
+			"owner_percentage":     1,
 			"top_bid_price":        1,
 			"profit_margin":        1,
 			"last_updated":         1,

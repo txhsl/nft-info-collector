@@ -14,16 +14,68 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+type SearchRequest struct {
+	Keyword            string  `json:"keyword"`
+	TimeRange          string  `json:"time_range"`
+	FloorPriceMin      float32 `json:"floor_price_min"`
+	FloorPriceMax      float32 `json:"floor_price_max"`
+	SaleCountMin       int     `json:"sale_count_min"`
+	SaleCountMax       int     `json:"sale_count_max"`
+	RoyaltyMin         int     `json:"royalty_min"`
+	RoyaltyMax         int     `json:"royalty_max"`
+	ProfitMarginMin    float32 `json:"profit_margin_min"`
+	ProfitMarginMax    float32 `json:"profit_margin_max"`
+	OwnerPercentageMin float32 `json:"owner_percentage_min"`
+	OwnerPercentageMax float32 `json:"owner_percentage_max"`
+	CollectionAgeMin   int     `json:"collection_age_min"`
+	CollectionAgeMax   int     `json:"collection_age_max"`
+	Sort               string  `json:"sort"`
+	Asc                bool    `json:"asc"`
+	Offset             int     `json:"offset"`
+	Limit              int     `json:"limit"`
+}
+
 func SearchCollections(ctx iris.Context) {
 	logger := ctx.Application().Logger()
 	conf := config.Load().Keywords
 
-	// filter params
-	keyword := ctx.URLParam("keyword")
-	timeRange := ctx.URLParam("time_range")
+	// parse params
+	body, err := ctx.GetBody()
+	if err != nil {
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+	type searchReq SearchRequest
+	req := &searchReq{
+		Keyword:            "",
+		TimeRange:          "1d",
+		FloorPriceMin:      0.0,
+		FloorPriceMax:      math.MaxFloat32,
+		SaleCountMin:       0,
+		SaleCountMax:       math.MaxInt,
+		RoyaltyMin:         0,
+		RoyaltyMax:         math.MaxInt,
+		ProfitMarginMin:    -math.MaxFloat32,
+		ProfitMarginMax:    math.MaxFloat32,
+		OwnerPercentageMin: 0.0,
+		OwnerPercentageMax: 100.0,
+		CollectionAgeMin:   0,
+		CollectionAgeMax:   math.MaxInt,
+		Sort:               "total_volume",
+		Asc:                false,
+		Offset:             0,
+		Limit:              20,
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		logger.Error("[API] Failed to deserialize search request")
+		ctx.StopWithStatus(iris.StatusInternalServerError)
+		return
+	}
+
+	// validate params
 	isBadReq := true
 	for _, t := range conf.Times {
-		if t == timeRange {
+		if t == req.TimeRange {
 			isBadReq = false
 			break
 		}
@@ -32,26 +84,9 @@ func SearchCollections(ctx iris.Context) {
 		ctx.StopWithStatus(iris.StatusBadRequest)
 		return
 	}
-
-	// range params
-	floorPriceMin := ctx.URLParamIntDefault("floor_price_min", 0)
-	floorPriceMax := ctx.URLParamIntDefault("floor_price_max", math.MaxInt)
-	saleCountMin := ctx.URLParamIntDefault("sale_count_min", 0)
-	saleCountMax := ctx.URLParamIntDefault("sale_count_max", math.MaxInt)
-	royaltyMin := ctx.URLParamIntDefault("royalty_min", 0)
-	royaltyMax := ctx.URLParamIntDefault("royalty_max", 10000)
-	profitMarginMin := ctx.URLParamIntDefault("profit_margin_min", math.MinInt)
-	profitMarginMax := ctx.URLParamIntDefault("profit_margin_max", math.MaxInt)
-	ownerPercentageMin := ctx.URLParamIntDefault("owner_percentage_min", 0)
-	ownerPercentageMax := ctx.URLParamIntDefault("owner_percentage_max", 100)
-	collectionAgeMin := ctx.URLParamIntDefault("collection_age_min", 0)
-	collectionAgeMax := ctx.URLParamIntDefault("collection_age_max", math.MaxInt)
-
-	// sort params
-	sort := ctx.URLParamDefault("sort", "total_volume")
 	isBadReq = true
 	for _, s := range conf.Sorts {
-		if s == sort {
+		if s == req.Sort {
 			isBadReq = false
 			break
 		}
@@ -60,12 +95,7 @@ func SearchCollections(ctx iris.Context) {
 		ctx.StopWithStatus(iris.StatusBadRequest)
 		return
 	}
-	asc := ctx.URLParamBoolDefault("asc", false)
-
-	// pagination params
-	offset := ctx.URLParamIntDefault("offset", 0)
-	limit := ctx.URLParamIntDefault("limit", 20)
-	if limit > 50 {
+	if req.Offset < 0 || req.Limit < 0 || req.Limit > 50 {
 		ctx.StopWithStatus(iris.StatusBadRequest)
 		return
 	}
@@ -74,27 +104,26 @@ func SearchCollections(ctx iris.Context) {
 	collections, err := db.SearchCollections(
 		context.TODO(),
 		logger,
-		timeRange,
-		floorPriceMin,
-		floorPriceMax,
-		saleCountMin,
-		saleCountMax,
-		royaltyMin,
-		royaltyMax,
-		profitMarginMin,
-		profitMarginMax,
-		ownerPercentageMin,
-		ownerPercentageMax,
-		collectionAgeMin,
-		collectionAgeMax,
-		keyword,
-		sort,
-		asc,
-		offset,
-		limit,
+		req.TimeRange,
+		req.FloorPriceMin,
+		req.FloorPriceMax,
+		req.SaleCountMin,
+		req.SaleCountMax,
+		req.RoyaltyMin,
+		req.RoyaltyMax,
+		req.ProfitMarginMin,
+		req.ProfitMarginMax,
+		req.OwnerPercentageMin,
+		req.OwnerPercentageMax,
+		req.CollectionAgeMin,
+		req.CollectionAgeMax,
+		req.Keyword,
+		req.Sort,
+		req.Asc,
+		req.Offset,
+		req.Limit,
 	)
 	if err != nil {
-		logger.Error(err)
 		logger.Error("[DB] Failed to read cached collections")
 		ctx.StopWithStatus(iris.StatusInternalServerError)
 		return

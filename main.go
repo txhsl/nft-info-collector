@@ -4,6 +4,7 @@ import (
 	"nft-info-collector/api"
 	"nft-info-collector/config"
 
+	"github.com/iris-contrib/middleware/cors"
 	"github.com/kataras/iris/v12"
 	"github.com/kataras/iris/v12/middleware/logger"
 	"github.com/kataras/iris/v12/middleware/recover"
@@ -20,6 +21,13 @@ func main() {
 	})
 	app.Use(customLogger)
 
+	// cors config
+	crs := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowCredentials: true,
+	})
+	app.UseRouter(crs)
+
 	// iris routes
 	app.Get("/", hello)
 
@@ -30,13 +38,13 @@ func main() {
 	}
 	updateAPI := app.Party("/update")
 	{
-		updateAPI.Get("/index", api.UpdateCachedCollectionIndex)
-		updateAPI.Get("/details", api.UpdateCachedCollectionDetails)
-		updateAPI.Get("/metrics", api.UpdateCachedCollectionMetrics)
+		updateAPI.Post("/index", api.UpdateCachedCollectionIndex)
+		updateAPI.Post("/details", api.UpdateCachedCollectionDetails)
+		updateAPI.Post("/metrics", api.UpdateCachedCollectionMetrics)
 	}
 	collectionAPI := app.Party("/collection")
 	{
-		collectionAPI.Get("/search", api.SearchCollections)
+		collectionAPI.Post("/search", api.SearchCollections)
 		collectionAPI.Get("/detail/{slug}", api.GetCollectionDetail)
 	}
 	nftAPI := app.Party("/nft")
